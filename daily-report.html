@@ -1150,9 +1150,17 @@ function loadPersistNote() {
 // ============================
 // 本日のスケジュール表示
 // ============================
+// scheduleCheckedはFirebaseの独立パスで一元管理
+let _scheduleChecked = {}; // { itemId: true }
+
 function loadTodaySchedule() {
-  _fbdb.ref('scheduleData').once('value').then(snap => {
-    renderTodaySchedule(snap.val());
+  // チェック状態とスケジュールを並行取得
+  Promise.all([
+    _fbdb.ref('scheduleData').once('value'),
+    _fbdb.ref('scheduleChecked').once('value')
+  ]).then(([schedSnap, checkSnap]) => {
+    _scheduleChecked = checkSnap.val() || {};
+    renderTodaySchedule(schedSnap.val());
   }).catch(() => renderTodaySchedule(null));
 }
 
@@ -1164,24 +1172,21 @@ function renderTodaySchedule(allData) {
   const typeColor = { task: '#6D8B74', event: '#5B7FA6', deadline: '#B71C1C', insta: '#C13584' };
   const typeBg    = { task: '#E8F5E9', event: '#E3F0FB', deadline: '#FFEBEE', insta: '#FDE8F5' };
 
-  // 当日＋繰越（過去の未完了）を収集
-  const d = getDay();
-  const checked = d.scheduleChecked || {};
-  const allItems = []; // { dateStr, item }
+  const allItems = [];
 
   if (allData) {
-    // 過去の未完了アイテムを繰越
+    // 過去の未完了アイテムを繰越（チェック済みは除外）
     Object.keys(allData).filter(dt => dt < currentDate).sort().forEach(dt => {
       const dayItems = Array.isArray(allData[dt]) ? allData[dt] : Object.values(allData[dt] || {});
       dayItems.forEach(item => {
-        if (!checked[item.id]) allItems.push({ dateStr: dt, item, carried: true });
+        if (!_scheduleChecked[item.id]) allItems.push({ item, carried: true });
       });
     });
-    // 当日アイテム
+    // 当日アイテム（完了済みも表示）
     const todayRaw = allData[currentDate];
     if (todayRaw) {
       const todayItems = Array.isArray(todayRaw) ? todayRaw : Object.values(todayRaw);
-      todayItems.forEach(item => allItems.push({ dateStr: currentDate, item, carried: false }));
+      todayItems.forEach(item => allItems.push({ item, carried: false }));
     }
   }
 
@@ -1193,7 +1198,7 @@ function renderTodaySchedule(allData) {
   }
 
   body.innerHTML = allItems.map(({ item, carried }) => {
-    const isDone = !!checked[item.id];
+    const isDone = !!_scheduleChecked[item.id];
     return `
     <div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);${isDone ? 'opacity:0.45;' : ''}">
       <input type="checkbox" ${isDone ? 'checked' : ''}
@@ -1206,16 +1211,15 @@ function renderTodaySchedule(allData) {
   }).join('');
 }
 
-function toggleScheduleCheck(itemId, checked) {
-  const d = getDay();
-  if (!d.scheduleChecked) d.scheduleChecked = {};
-  if (checked) {
-    d.scheduleChecked[itemId] = true;
+function toggleScheduleCheck(itemId, isChecked) {
+  if (isChecked) {
+    _scheduleChecked[itemId] = true;
   } else {
-    delete d.scheduleChecked[itemId];
+    delete _scheduleChecked[itemId];
   }
-  saveData();
-  // 再描画
+  // Firebaseの独立パスに保存（日付をまたいでも維持）
+  _fbdb.ref('scheduleChecked').set(_scheduleChecked);
+  // 再描画（スケジュールデータ再取得）
   _fbdb.ref('scheduleData').once('value').then(snap => {
     renderTodaySchedule(snap.val());
   });
