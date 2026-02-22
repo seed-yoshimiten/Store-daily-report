@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>📅 月間スケジュール</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyBfdMJG7h1y0UysvpWDZ6cxDzje3c1FG_E",
+    authDomain: "store-daily-report-cc029.firebaseapp.com",
+    databaseURL: "https://store-daily-report-cc029-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "store-daily-report-cc029",
+    storageBucket: "store-daily-report-cc029.firebasestorage.app",
+    messagingSenderId: "503319985396",
+    appId: "1:503319985396:web:c5166d55c7dc24b27ab2a1"
+  });
+</script>
+<style>
+  :root {
+    --cream: #FDF8F0;
+    --cream2: #F5EDD8;
+    --caramel: #C8893A;
+    --brown: #5C3D1E;
+    --brown-light: #8B6040;
+    --text: #2C1810;
+    --text-light: #7A5C44;
+    --border: #E8D5B7;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --task-color: #6D8B74;
+    --event-color: #5B7FA6;
+    --deadline-color: #B71C1C;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 60px;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--brown);
+    color: var(--cream);
+    padding: 14px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-title { font-size: 18px; font-weight: 700; }
+  .header-link {
+    font-size: 12px;
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+    background: rgba(255,255,255,0.15);
+    padding: 5px 12px;
+    border-radius: 20px;
+  }
+
+  /* MONTH NAV */
+  .month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: var(--cream2);
+    border-bottom: 1px solid var(--border);
+  }
+  .month-nav button {
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 50%;
+    width: 36px; height: 36px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .month-label { font-size: 18px; font-weight: 700; color: var(--brown); }
+
+  /* CALENDAR */
+  .calendar { padding: 12px 16px; }
+  .weekday-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-light);
+    margin-bottom: 6px;
+    padding: 0 2px;
+  }
+  .weekday-header span:first-child { color: #C62828; }
+  .weekday-header span:last-child { color: #5B7FA6; }
+
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+  .cal-day {
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 4px 3px;
+    min-height: 64px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+  .cal-day:hover { border-color: var(--caramel); }
+  .cal-day.empty { background: transparent; border: none; cursor: default; }
+  .cal-day.today { border-color: var(--caramel); background: #FFFDF5; }
+  .cal-day.has-items { background: #FAFFF9; }
+  .cal-day.selected { border: 3px solid var(--brown) !important; background: #FFF8F0; }
+  .day-num {
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 3px;
+    line-height: 1.4;
+  }
+  .cal-day.sunday .day-num { color: #C62828; }
+  .cal-day.saturday .day-num { color: #5B7FA6; }
+  .cal-day.today .day-num {
+    background: var(--caramel);
+    color: white;
+    border-radius: 50%;
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 3px;
+    font-size: 12px;
+  }
+  .cal-dots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    justify-content: center;
+  }
+  .cal-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+  .dot-task { background: var(--task-color); }
+  .dot-event { background: var(--event-color); }
+  .dot-deadline { background: var(--deadline-color); }
+  .dot-insta { background: #C13584; }
+
+  /* DAY DETAIL PANEL */
+  .day-panel {
+    margin: 12px 16px 0;
+    background: white;
+    border: 2px solid var(--caramel);
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: none;
+  }
+  .day-panel.active { display: block; }
+  .day-panel-header {
+    background: var(--caramel);
+    color: white;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .day-panel-body { padding: 14px 16px; }
+
+  /* ITEMS */
+  .schedule-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+    border: 1px solid var(--border);
+    background: var(--cream);
+  }
+  .item-type-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .badge-task { background: #E8F5E9; color: var(--task-color); }
+  .badge-event { background: #E3F0FB; color: var(--event-color); }
+  .badge-deadline { background: #FFEBEE; color: var(--deadline-color); }
+  .badge-insta { background: #FDE8F5; color: #C13584; }
+  .item-text { font-size: 14px; flex: 1; line-height: 1.5; }
+  .item-delete {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 2px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .empty-msg { text-align: center; color: #bbb; font-size: 13px; padding: 12px 0; }
+
+  /* ADD FORM */
+  .add-form {
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    margin-top: 8px;
+  }
+  .add-form-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+  .type-select {
+    font-size: 13px;
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--cream);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 6px;
+    color: var(--text);
+    flex-shrink: 0;
+  }
+  .text-input {
+    flex: 1;
+    font-size: 14px;
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--cream);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    color: var(--text);
+  }
+  .text-input:focus, .type-select:focus { outline: none; border-color: var(--caramel); }
+  .add-btn {
+    background: var(--caramel);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--brown);
+    color: white;
+    padding: 10px 24px;
+    border-radius: 24px;
+    font-size: 14px;
+    font-weight: 700;
+    transition: transform 0.3s;
+    z-index: 999;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    gap: 12px;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--text-light);
+    flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">📅 月間スケジュール</div>
+  <a href="daily-report.html" class="header-link">← 日報へ</a>
+</header>
+
+<div class="month-nav">
+  <button onclick="changeMonth(-1)">‹</button>
+  <div class="month-label" id="monthLabel"></div>
+  <button onclick="changeMonth(1)">›</button>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--task-color)"></div>タスク</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--event-color)"></div>イベント</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--deadline-color)"></div>締め切り</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#C13584"></div>Instaストーリー</div>
+</div>
+
+<div class="calendar">
+  <div class="weekday-header">
+    <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+  </div>
+  <div class="calendar-grid" id="calendarGrid"></div>
+</div>
+
+<!-- 日付詳細パネル -->
+<div class="day-panel" id="dayPanel">
+  <div class="day-panel-header">
+    <span id="panelDateLabel"></span>
+    <button onclick="closePanel()" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;line-height:1;">×</button>
+  </div>
+  <div class="day-panel-body">
+    <div id="panelItems"></div>
+    <div class="add-form">
+      <div class="add-form-row">
+        <select class="type-select" id="newItemType">
+          <option value="task">📋 タスク</option>
+          <option value="event">🎉 イベント</option>
+          <option value="deadline">⏰ 締め切り</option>
+          <option value="insta">📸 Instaストーリー</option>
+        </select>
+        <input type="text" class="text-input" id="newItemText" placeholder="内容を入力..." onkeydown="if(event.key==='Enter')addItem()">
+        <button class="add-btn" onclick="addItem()">＋</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const _db = firebase.database();
+let scheduleData = {}; // { 'YYYY-MM-DD': [{id, type, text}, ...] }
+let currentYear, currentMonth;
+let selectedDate = null;
+
+// ============================
+// INIT
+// ============================
+function init() {
+  const today = new Date();
+  currentYear = today.getFullYear();
+  currentMonth = today.getMonth();
+  loadSchedule();
+}
+
+function loadSchedule() {
+  _db.ref('scheduleData').once('value').then(snap => {
+    scheduleData = snap.val() || {};
+    renderCalendar();
+  }).catch(() => {
+    scheduleData = {};
+    renderCalendar();
+  });
+}
+
+function saveSchedule() {
+  _db.ref('scheduleData').set(scheduleData).catch(err => console.error(err));
+}
+
+// ============================
+// CALENDAR
+// ============================
+function changeMonth(delta) {
+  currentMonth += delta;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  if (currentMonth < 0)  { currentMonth = 11; currentYear--; }
+  closePanel();
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const today = new Date();
+  const todayStr = toDateStr(today);
+
+  document.getElementById('monthLabel').textContent =
+    `${currentYear}年${currentMonth + 1}月`;
+
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const grid = document.getElementById('calendarGrid');
+
+  let html = '';
+  // 空白マス
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div class="cal-day empty"></div>';
+  }
+  // 日付マス
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = toDateStr(new Date(currentYear, currentMonth, d));
+    const dow = new Date(currentYear, currentMonth, d).getDay();
+    const isToday = dateStr === todayStr;
+    const isSelected = dateStr === selectedDate;
+    const items = scheduleData[dateStr] || [];
+    const hasItems = items.length > 0;
+
+    const classes = [
+      'cal-day',
+      dow === 0 ? 'sunday' : dow === 6 ? 'saturday' : '',
+      isToday ? 'today' : '',
+      hasItems ? 'has-items' : '',
+      isSelected ? 'selected' : ''
+    ].filter(Boolean).join(' ');
+
+    const dots = [...new Set(items.map(i => i.type))]
+      .map(t => `<div class="cal-dot dot-${t}"></div>`).join('');
+
+    html += `
+      <div class="${classes}" onclick="selectDate('${dateStr}')">
+        <div class="day-num">${d}</div>
+        <div class="cal-dots">${dots}</div>
+      </div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function toDateStr(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+// ============================
+// DAY PANEL
+// ============================
+function selectDate(dateStr) {
+  selectedDate = dateStr;
+  const dt = new Date(dateStr + 'T00:00:00');
+  const days = ['日','月','火','水','木','金','土'];
+  document.getElementById('panelDateLabel').textContent =
+    `${dt.getMonth()+1}月${dt.getDate()}日（${days[dt.getDay()]}）`;
+  renderPanel();
+  const panel = document.getElementById('dayPanel');
+  panel.classList.add('active');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.getElementById('newItemText').focus();
+  renderCalendar(); // 選択状態を更新
+}
+
+function closePanel() {
+  selectedDate = null;
+  document.getElementById('dayPanel').classList.remove('active');
+  renderCalendar();
+}
+
+function renderPanel() {
+  const items = scheduleData[selectedDate] || [];
+  const el = document.getElementById('panelItems');
+  if (!items.length) {
+    el.innerHTML = '<div class="empty-msg">予定はありません</div>';
+    return;
+  }
+  const typeLabel = { task: 'タスク', event: 'イベント', deadline: '締め切り', insta: 'Instaストーリー' };
+  el.innerHTML = items.map(item => `
+    <div class="schedule-item">
+      <span class="item-type-badge badge-${item.type}">${typeLabel[item.type]||item.type}</span>
+      <span class="item-text">${esc(item.text)}</span>
+      <button class="item-delete" onclick="deleteItem('${item.id}')">×</button>
+    </div>`).join('');
+}
+
+function addItem() {
+  if (!selectedDate) return;
+  const text = document.getElementById('newItemText').value.trim();
+  if (!text) return;
+  const type = document.getElementById('newItemType').value;
+  if (!scheduleData[selectedDate]) scheduleData[selectedDate] = [];
+  scheduleData[selectedDate].push({ id: Date.now(), type, text });
+  saveSchedule();
+  document.getElementById('newItemText').value = '';
+  renderPanel();
+  renderCalendar();
+  showToast('追加しました');
+}
+
+function deleteItem(id) {
+  if (!selectedDate) return;
+  scheduleData[selectedDate] = (scheduleData[selectedDate] || []).filter(i => i.id != id);
+  if (scheduleData[selectedDate].length === 0) delete scheduleData[selectedDate];
+  saveSchedule();
+  renderPanel();
+  renderCalendar();
+  showToast('削除しました');
+}
+
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================
+// TOAST
+// ============================
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+init();
+</script>
+</body>
+</html>
