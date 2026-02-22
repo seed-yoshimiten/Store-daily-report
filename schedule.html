@@ -233,10 +233,10 @@
     border-radius: 8px;
     padding: 8px 6px;
     color: var(--text);
-    flex-shrink: 0;
+    width: 100%;
   }
   .text-input {
-    flex: 1;
+    width: 100%;
     font-size: 14px;
     font-family: 'Noto Sans JP', sans-serif;
     background: var(--cream);
@@ -251,11 +251,11 @@
     color: white;
     border: none;
     border-radius: 8px;
-    padding: 8px 16px;
+    padding: 11px;
     font-size: 15px;
     font-weight: 700;
     cursor: pointer;
-    flex-shrink: 0;
+    width: 100%;
   }
 
   /* TOAST */
@@ -325,15 +325,17 @@
   <div class="day-panel-body">
     <div id="panelItems"></div>
     <div class="add-form">
-      <div class="add-form-row">
+      <div style="margin-bottom:8px;">
         <select class="type-select" id="newItemType">
           <option value="task">📋 タスク</option>
           <option value="event">🎉 イベント</option>
           <option value="deadline">⏰ 締め切り</option>
           <option value="insta">📸 Instaストーリー</option>
         </select>
+      </div>
+      <div style="display:flex;gap:6px;">
         <input type="text" class="text-input" id="newItemText" placeholder="内容を入力..." onkeydown="if(event.key==='Enter')addItem()">
-        <button class="add-btn" onclick="addItem()">＋</button>
+        <button class="add-btn" onclick="addItem()" style="width:48px;flex-shrink:0;">＋</button>
       </div>
     </div>
   </div>
