@@ -545,10 +545,13 @@
       <div class="header-title">🧀 日報 <span id="syncIndicator" style="font-size:11px;font-weight:400;opacity:0.7;margin-left:6px;"></span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
-    <div class="date-nav">
-      <button onclick="changeDate(-1)">‹</button>
-      <span class="date-label" id="navDate"></span>
-      <button onclick="changeDate(1)">›</button>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <a href="schedule.html" style="font-size:12px;color:rgba(255,255,255,0.85);text-decoration:none;background:rgba(255,255,255,0.15);padding:5px 10px;border-radius:20px;white-space:nowrap;font-weight:700;">📅 スケジュール</a>
+      <div class="date-nav">
+        <button onclick="changeDate(-1)">‹</button>
+        <span class="date-label" id="navDate"></span>
+        <button onclick="changeDate(1)">›</button>
+      </div>
     </div>
   </div>
 </header>
@@ -582,6 +585,15 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- 本日のスケジュール -->
+  <div class="card" id="todayScheduleCard">
+    <div class="card-header" style="background:#5B7FA6;">
+      📅 本日のスケジュール
+      <a href="schedule.html" style="margin-left:auto;background:rgba(255,255,255,0.2);color:white;text-decoration:none;font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;">月間カレンダー →</a>
+    </div>
+    <div class="card-body" id="todayScheduleBody"></div>
   </div>
 
   <!-- ② 全体の共有事項 -->
@@ -932,6 +944,7 @@ function sanitizeAllData() {
     if (!Array.isArray(d.hazards))      d.hazards = [];
     if (typeof d.confirms !== 'object' || Array.isArray(d.confirms)) d.confirms = {};
     if (typeof d.weeklyChecked !== 'object' || Array.isArray(d.weeklyChecked)) d.weeklyChecked = {};
+    if (typeof d.scheduleChecked !== 'object' || Array.isArray(d.scheduleChecked)) d.scheduleChecked = {};
   });
 }
 
@@ -1131,6 +1144,80 @@ function loadPersistNote() {
     const text = snap.val() || '';
     document.getElementById('persistShareNote').value = text;
     updatePersistSharePreview();
+  });
+}
+
+// ============================
+// 本日のスケジュール表示
+// ============================
+function loadTodaySchedule() {
+  _fbdb.ref('scheduleData').once('value').then(snap => {
+    renderTodaySchedule(snap.val());
+  }).catch(() => renderTodaySchedule(null));
+}
+
+function renderTodaySchedule(allData) {
+  const card = document.getElementById('todayScheduleCard');
+  const body = document.getElementById('todayScheduleBody');
+
+  const typeLabel = { task: '📋 タスク', event: '🎉 イベント', deadline: '⏰ 締め切り', insta: '📸 Instaストーリー' };
+  const typeColor = { task: '#6D8B74', event: '#5B7FA6', deadline: '#B71C1C', insta: '#C13584' };
+  const typeBg    = { task: '#E8F5E9', event: '#E3F0FB', deadline: '#FFEBEE', insta: '#FDE8F5' };
+
+  // 当日＋繰越（過去の未完了）を収集
+  const d = getDay();
+  const checked = d.scheduleChecked || {};
+  const allItems = []; // { dateStr, item }
+
+  if (allData) {
+    // 過去の未完了アイテムを繰越
+    Object.keys(allData).filter(dt => dt < currentDate).sort().forEach(dt => {
+      const dayItems = Array.isArray(allData[dt]) ? allData[dt] : Object.values(allData[dt] || {});
+      dayItems.forEach(item => {
+        if (!checked[item.id]) allItems.push({ dateStr: dt, item, carried: true });
+      });
+    });
+    // 当日アイテム
+    const todayRaw = allData[currentDate];
+    if (todayRaw) {
+      const todayItems = Array.isArray(todayRaw) ? todayRaw : Object.values(todayRaw);
+      todayItems.forEach(item => allItems.push({ dateStr: currentDate, item, carried: false }));
+    }
+  }
+
+  card.style.display = 'block';
+
+  if (!allItems.length) {
+    body.innerHTML = '<div style="text-align:center;color:#bbb;font-size:13px;padding:12px 0;">予定なし</div>';
+    return;
+  }
+
+  body.innerHTML = allItems.map(({ item, carried }) => {
+    const isDone = !!checked[item.id];
+    return `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);${isDone ? 'opacity:0.45;' : ''}">
+      <input type="checkbox" ${isDone ? 'checked' : ''}
+        onchange="toggleScheduleCheck('${item.id}', this.checked)"
+        style="width:18px;height:18px;accent-color:var(--caramel);cursor:pointer;flex-shrink:0;">
+      <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;background:${typeBg[item.type]||'#eee'};color:${typeColor[item.type]||'#666'};">${typeLabel[item.type]||item.type}</span>
+      <span style="font-size:14px;flex:1;${isDone ? 'text-decoration:line-through;' : ''}">${esc(item.text)}</span>
+      ${carried ? '<span style="font-size:11px;color:var(--danger);font-weight:700;background:#FFF0F0;border-radius:20px;padding:2px 8px;flex-shrink:0;">繰越</span>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function toggleScheduleCheck(itemId, checked) {
+  const d = getDay();
+  if (!d.scheduleChecked) d.scheduleChecked = {};
+  if (checked) {
+    d.scheduleChecked[itemId] = true;
+  } else {
+    delete d.scheduleChecked[itemId];
+  }
+  saveData();
+  // 再描画
+  _fbdb.ref('scheduleData').once('value').then(snap => {
+    renderTodaySchedule(snap.val());
   });
 }
 
@@ -1893,6 +1980,7 @@ function renderAll() {
   document.getElementById('persistSharePreview').style.display = 'block';
   document.getElementById('persistShareToggleBtn').textContent = '✏️ 編集';
   // Lists
+  loadTodaySchedule();
   renderOrders();
   renderDailyTasks();
   renderWeeklyTasks();
@@ -1908,6 +1996,7 @@ function renderAll() {
 // ============================
 loadData();
 loadPersistNote();
+loadTodaySchedule();
 </script>
 </body>
 </html>
