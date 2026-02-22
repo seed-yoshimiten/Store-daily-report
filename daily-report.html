@@ -601,9 +601,29 @@
     </div>
   </div>
 
+  <!-- 継続的な共有 -->
+  <div class="card" style="border:2.5px solid var(--brown-light);">
+    <div class="card-header" style="background:var(--brown-light);font-size:15px;padding:13px 16px;">
+      📌 継続的な共有
+      <span onclick="togglePersistShareMode()" style="margin-left:auto;font-size:12px;background:rgba(255,255,255,0.25);padding:3px 10px;border-radius:20px;cursor:pointer;font-weight:700;" id="persistShareToggleBtn">✏️ 編集</span>
+    </div>
+    <!-- 閲覧モード -->
+    <div id="persistSharePreview" onclick="togglePersistShareMode()" style="padding:16px 18px;font-size:16px;line-height:1.85;white-space:pre-wrap;color:var(--text);min-height:90px;font-weight:500;background:#FDF5EC;cursor:pointer;border-radius:0 0 var(--radius) var(--radius);text-align:left;">
+      <span id="persistSharePreviewText" style="color:#bbb;font-style:italic;">（継続共有事項なし　タップして入力）</span>
+    </div>
+    <!-- 編集モード -->
+    <div id="persistShareEditArea" style="display:none;padding:12px 14px;background:#FDF5EC;border-radius:0 0 var(--radius) var(--radius);">
+      <textarea id="persistShareNote" placeholder="削除するまで毎日表示される共有事項を入力..." oninput="savePersistNote();updatePersistSharePreview()" style="min-height:180px;font-size:16px;line-height:1.8;background:#fff;border:2px solid var(--brown-light);border-radius:10px;padding:12px 14px;font-weight:500;width:100%;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button onclick="togglePersistShareMode()" style="flex:1;background:var(--brown-light);color:white;border:none;border-radius:8px;padding:11px;font-size:15px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;">✓ 完了</button>
+        <button onclick="clearPersistNote()" style="flex:0 0 auto;background:#fff;color:var(--danger);border:1.5px solid var(--danger);border-radius:8px;padding:11px 16px;font-size:14px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;">🗑 削除</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ⑤ 日次タスク -->
   <div class="card">
-    <div class="card-header">✅ タスク（日次）</div>
+    <div class="card-header" style="background:#6D8B74;">✅ タスク（日次）</div>
     <div class="card-body">
       <div id="dailyTaskList"></div>
       <div class="add-row">
@@ -615,7 +635,7 @@
 
   <!-- ⑥ 週次タスク -->
   <div class="card">
-    <div class="card-header">
+    <div class="card-header" style="background:#6D8B74;">
       🗓 タスク（週次）
       <button onclick="openWeeklySettings()" style="margin-left:auto;background:rgba(255,255,255,0.2);border:none;color:white;font-size:12px;font-weight:700;font-family:'Noto Sans JP',sans-serif;padding:4px 12px;border-radius:20px;cursor:pointer;">⚙ 設定</button>
     </div>
@@ -627,7 +647,7 @@
 
   <!-- ③ 予約確認 -->
   <div class="card">
-    <div class="card-header">📅 予約確認</div>
+    <div class="card-header" style="background:#5B7FA6;">📅 予約確認</div>
     <div class="card-body">
       <div id="resList"></div>
       <button class="save-btn" style="background:var(--brown)" onclick="openModal('res')">＋ 予約を追加</button>
@@ -636,7 +656,7 @@
 
   <!-- ⑦ 発送物 -->
   <div class="card">
-    <div class="card-header">🚚 発送物</div>
+    <div class="card-header" style="background:#5B7FA6;">🚚 発送物</div>
     <div class="card-body">
       <div id="shipList"></div>
       <button class="save-btn" style="background:var(--brown)" onclick="openModal('ship')">＋ 発送物を追加</button>
@@ -645,7 +665,7 @@
 
   <!-- ④ 発注リスト -->
   <div class="card">
-    <div class="card-header">📦 発注リスト</div>
+    <div class="card-header" style="background:#7A6B8A;">📦 発注リスト</div>
     <div class="card-body">
       <div id="orderList"></div>
       <div class="add-row">
@@ -657,7 +677,7 @@
 
   <!-- 保管在庫リスト -->
   <div class="card">
-    <div class="card-header">🏪 保管在庫リスト</div>
+    <div class="card-header" style="background:#7A6B8A;">🏪 保管在庫リスト</div>
     <div class="card-body">
       <div id="stockList"></div>
       <button class="save-btn" style="background:var(--brown);margin-top:4px;" onclick="openModal('stock')">＋ 在庫を追加</button>
@@ -666,7 +686,7 @@
 
   <!-- ⑧ 日報確認 -->
   <div class="card">
-    <div class="card-header">👤 日報確認</div>
+    <div class="card-header" style="background:#4A7C6F;">👤 日報確認</div>
     <div class="card-body">
       <!-- 共通メモ欄 -->
       <div style="margin-bottom:10px;">
@@ -1057,6 +1077,61 @@ function updateSharePreview() {
     el.style.fontStyle = 'italic';
     el.textContent = '（共有事項なし　タップして入力）';
   }
+}
+
+// ============================
+// 継続的な共有（グローバル保存）
+// ============================
+function togglePersistShareMode() {
+  const preview = document.getElementById('persistSharePreview');
+  const editArea = document.getElementById('persistShareEditArea');
+  const btn = document.getElementById('persistShareToggleBtn');
+  const isEditing = editArea.style.display !== 'none';
+  if (isEditing) {
+    editArea.style.display = 'none';
+    preview.style.display = 'block';
+    btn.textContent = '✏️ 編集';
+  } else {
+    editArea.style.display = 'block';
+    preview.style.display = 'none';
+    btn.textContent = '✓ 完了';
+    document.getElementById('persistShareNote').focus();
+  }
+}
+
+function savePersistNote() {
+  const text = document.getElementById('persistShareNote').value;
+  _fbdb.ref('persistShareNote').set(text);
+}
+
+function clearPersistNote() {
+  if (!confirm('継続的な共有を削除しますか？')) return;
+  document.getElementById('persistShareNote').value = '';
+  _fbdb.ref('persistShareNote').set('');
+  updatePersistSharePreview();
+  togglePersistShareMode();
+}
+
+function updatePersistSharePreview() {
+  const text = document.getElementById('persistShareNote').value.trim();
+  const el = document.getElementById('persistSharePreviewText');
+  if (text) {
+    el.style.color = 'var(--text)';
+    el.style.fontStyle = 'normal';
+    el.textContent = text;
+  } else {
+    el.style.color = '#bbb';
+    el.style.fontStyle = 'italic';
+    el.textContent = '（継続共有事項なし　タップして入力）';
+  }
+}
+
+function loadPersistNote() {
+  _fbdb.ref('persistShareNote').on('value', snap => {
+    const text = snap.val() || '';
+    document.getElementById('persistShareNote').value = text;
+    updatePersistSharePreview();
+  });
 }
 
 // ============================
@@ -1814,6 +1889,9 @@ function renderAll() {
   document.getElementById('shareEditArea').style.display = 'none';
   document.getElementById('sharePreview').style.display = 'block';
   document.getElementById('shareToggleBtn').textContent = '✏️ 編集';
+  document.getElementById('persistShareEditArea').style.display = 'none';
+  document.getElementById('persistSharePreview').style.display = 'block';
+  document.getElementById('persistShareToggleBtn').textContent = '✏️ 編集';
   // Lists
   renderOrders();
   renderDailyTasks();
@@ -1828,8 +1906,8 @@ function renderAll() {
 // ============================
 // INIT
 // ============================
-// compat版SDKは同期読み込みなので直接起動できる
 loadData();
+loadPersistNote();
 </script>
 </body>
 </html>
