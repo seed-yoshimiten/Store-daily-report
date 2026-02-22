@@ -789,32 +789,63 @@ function getDayOfWeek(ds) {
 // ============================
 // STORAGE（Firebase同期）
 // ============================
+const _fbdb = firebase.database();
 let _saveTimer = null;
 let _saveWeeklyTimer = null;
 let _saveStaffTimer = null;
-const _fbdb = firebase.database();
 
 function loadData() {
-  // Firebaseから一度だけ読み込んで起動
+  const ind = document.getElementById('syncIndicator');
+  if (ind) ind.textContent = '読込中...';
   _fbdb.ref('/').once('value').then(snapshot => {
     const val = snapshot.val() || {};
     data = val.reportData || {};
     window.weeklyTasks = val.weeklyTasks ? Object.values(val.weeklyTasks) : defaultWeeklyTasks();
-    window.staffList = val.staffList || ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
+    window.staffList = Array.isArray(val.staffList) ? val.staffList : ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
+    if (ind) ind.textContent = '';
     renderAll();
-  }).catch(() => {
+  }).catch(err => {
+    console.error('Firebase load error:', err);
     data = {};
     window.weeklyTasks = defaultWeeklyTasks();
     window.staffList = ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
+    if (ind) ind.textContent = '⚠ 接続失敗';
     renderAll();
   });
+}
+
+function saveData() {
+  clearTimeout(_saveTimer);
+  const ind = document.getElementById('syncIndicator');
+  if (ind) ind.textContent = '保存中...';
+  _saveTimer = setTimeout(() => {
+    // dataのコピーを保存（非同期中にdataが変わっても安全）
+    const snapshot = JSON.parse(JSON.stringify(data));
+    _fbdb.ref('reportData').set(snapshot)
+      .then(() => {
+        if (ind) { ind.textContent = '✓ 保存済'; setTimeout(() => { if(ind) ind.textContent = ''; }, 2000); }
+      })
+      .catch(err => {
+        console.error('Save error:', err);
+        if (ind) ind.textContent = '⚠ 保存失敗';
+      });
+  }, 500);
+}
+
+function saveWeeklyTasks() {
+  clearTimeout(_saveWeeklyTimer);
+  _saveWeeklyTimer = setTimeout(() => {
+    const obj = {};
+    window.weeklyTasks.forEach(t => { obj[t.id] = t; });
+    _fbdb.ref('weeklyTasks').set(obj).catch(err => console.error('WeeklyTasks save error:', err));
+  }, 500);
 }
 
 function saveStaff() {
   clearTimeout(_saveStaffTimer);
   _saveStaffTimer = setTimeout(() => {
-    _fbdb.ref('staffList').set(window.staffList);
-  }, 300);
+    _fbdb.ref('staffList').set(window.staffList).catch(err => console.error('Staff save error:', err));
+  }, 500);
 }
 
 function addStaff() {
@@ -834,43 +865,6 @@ function deleteStaff(name) {
   saveStaff();
   renderConfirm();
   showToast(`${name} を削除しました`);
-}
-
-let _isSaving = false;
-
-function saveData() {
-  clearTimeout(_saveTimer);
-  const ind = document.getElementById('syncIndicator');
-  if (ind) ind.textContent = '同期中...';
-  _saveTimer = setTimeout(() => {
-    _isSaving = true;
-    _fbdb.ref('reportData').set(data).then(() => {
-      if (ind) { ind.textContent = '✓ 保存済'; setTimeout(() => { ind.textContent = ''; }, 2000); }
-      setTimeout(() => { _isSaving = false; }, 1000);
-    }).catch(() => {
-      if (ind) ind.textContent = '⚠ 保存失敗';
-      _isSaving = false;
-    });
-  }, 300);
-}
-
-// 他端末の変更をポーリングで5秒ごとに取得（リアルタイムリスナーの代替）
-setInterval(() => {
-  if (_isSaving) return;
-  _fbdb.ref('reportData').once('value').then(snap => {
-    if (_isSaving) return;
-    const remote = snap.val();
-    if (remote) { data = remote; renderAll(); }
-  });
-}, 5000);
-
-function saveWeeklyTasks() {
-  clearTimeout(_saveWeeklyTimer);
-  _saveWeeklyTimer = setTimeout(() => {
-    const obj = {};
-    window.weeklyTasks.forEach((t, i) => { obj[t.id || i] = t; });
-    _fbdb.ref('weeklyTasks').set(obj);
-  }, 300);
 }
 
 function defaultWeeklyTasks() {
