@@ -800,6 +800,7 @@ function loadData() {
   _fbdb.ref('/').once('value').then(snapshot => {
     const val = snapshot.val() || {};
     data = val.reportData || {};
+    sanitizeAllData();
     window.weeklyTasks = val.weeklyTasks ? Object.values(val.weeklyTasks) : defaultWeeklyTasks();
     window.staffList = Array.isArray(val.staffList) ? val.staffList : ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
     if (ind) ind.textContent = '';
@@ -879,15 +880,39 @@ function defaultWeeklyTasks() {
 
 function getDay() {
   if (!data[currentDate]) {
-    data[currentDate] = {
-      budget: '', prevSales: '', prevGuests: '', shareNote: '',
-      orders: [], dailyTasks: [], reservations: [], shipments: [],
-      stocks: [],
-      confirms: {}, hazards: [], weeklyChecked: {}
-    };
-    saveData();
+    data[currentDate] = {};
   }
-  return data[currentDate];
+  // 欠けているフィールドを補完（Firebase経由で来たデータに配列が無い場合に対応）
+  const d = data[currentDate];
+  if (!d.orders)       d.orders = [];
+  if (!d.dailyTasks)   d.dailyTasks = [];
+  if (!d.reservations) d.reservations = [];
+  if (!d.shipments)    d.shipments = [];
+  if (!d.stocks)       d.stocks = [];
+  if (!d.hazards)      d.hazards = [];
+  if (!d.confirms)     d.confirms = {};
+  if (!d.weeklyChecked) d.weeklyChecked = {};
+  if (d.budget       === undefined) d.budget = '';
+  if (d.prevSales    === undefined) d.prevSales = '';
+  if (d.prevGuests   === undefined) d.prevGuests = '';
+  if (d.shareNote    === undefined) d.shareNote = '';
+  return d;
+}
+
+// Firebase読み込み後に全日付データを安全化するユーティリティ
+function sanitizeAllData() {
+  Object.keys(data).forEach(dateKey => {
+    const d = data[dateKey];
+    if (!d) { data[dateKey] = {}; return; }
+    if (!Array.isArray(d.orders))       d.orders = [];
+    if (!Array.isArray(d.dailyTasks))   d.dailyTasks = [];
+    if (!Array.isArray(d.reservations)) d.reservations = [];
+    if (!Array.isArray(d.shipments))    d.shipments = [];
+    if (!Array.isArray(d.stocks))       d.stocks = [];
+    if (!Array.isArray(d.hazards))      d.hazards = [];
+    if (typeof d.confirms !== 'object' || Array.isArray(d.confirms)) d.confirms = {};
+    if (typeof d.weeklyChecked !== 'object' || Array.isArray(d.weeklyChecked)) d.weeklyChecked = {};
+  });
 }
 
 // 表示用：当日データ＋過去の未チェック項目を動的にマージして返す
