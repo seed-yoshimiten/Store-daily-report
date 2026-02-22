@@ -5,11 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>🧀 日報 | チーズケーキ店</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-<!-- Firebase SDK -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
+<!-- Firebase SDK (compat版 = type=moduleなしで動作) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
   const firebaseConfig = {
     apiKey: "AIzaSyBfdMJG7h1y0UysvpWDZ6cxDzje3c1FG_E",
     authDomain: "store-daily-report-cc029.firebaseapp.com",
@@ -19,22 +18,12 @@
     messagingSenderId: "503319985396",
     appId: "1:503319985396:web:c5166d55c7dc24b27ab2a1"
   };
+  firebase.initializeApp(firebaseConfig);
+  const _db = firebase.database();
 
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-
-  // Firebaseへの書き込み関数をグローバルに公開
-  window._fbSet = (path, value) => set(ref(db, path), value);
-
-  // Firebaseからのリアルタイム読み込み
-  window._fbListen = (path, callback) => onValue(ref(db, path), snapshot => {
-    callback(snapshot.val());
-  });
-
-  // 初期化完了フラグ
+  window._fbSet = (path, value) => _db.ref(path).set(value);
+  window._fbListen = (path, callback) => _db.ref(path).on('value', snapshot => callback(snapshot.val()));
   window._fbReady = true;
-  // 初期化完了後にアプリを起動
-  if (window._appInit) window._appInit();
 </script>
 <style>
   :root {
@@ -1816,23 +1805,8 @@ function renderAll() {
 // ============================
 // INIT
 // ============================
-// Firebase SDK(type=module)の初期化を待ってから起動
-window._appInit = function() {
-  // 接続中インジケーターを表示
-  showToast('データを読み込み中...');
-  loadData();
-};
-
-// Firebase SDKがすでに読み込まれていれば即起動、まだなら待機
-if (window._fbReady) {
-  window._appInit();
-} else {
-  // SDKロード前でも最低限の画面を表示（オフライン対応）
-  data = {};
-  window.weeklyTasks = defaultWeeklyTasks();
-  window.staffList = ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
-  renderAll();
-}
+// compat版SDKは同期読み込みなので直接起動できる
+loadData();
 </script>
 </body>
 </html>
