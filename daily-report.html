@@ -1,0 +1,1838 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>🧀 日報 | チーズケーキ店</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBfdMJG7h1y0UysvpWDZ6cxDzje3c1FG_E",
+    authDomain: "store-daily-report-cc029.firebaseapp.com",
+    databaseURL: "https://store-daily-report-cc029-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "store-daily-report-cc029",
+    storageBucket: "store-daily-report-cc029.firebasestorage.app",
+    messagingSenderId: "503319985396",
+    appId: "1:503319985396:web:c5166d55c7dc24b27ab2a1"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // Firebaseへの書き込み関数をグローバルに公開
+  window._fbSet = (path, value) => set(ref(db, path), value);
+
+  // Firebaseからのリアルタイム読み込み
+  window._fbListen = (path, callback) => onValue(ref(db, path), snapshot => {
+    callback(snapshot.val());
+  });
+
+  // 初期化完了フラグ
+  window._fbReady = true;
+  // 初期化完了後にアプリを起動
+  if (window._appInit) window._appInit();
+</script>
+<style>
+  :root {
+    --cream: #FDF8F0;
+    --cream2: #F5EDD8;
+    --caramel: #C8893A;
+    --caramel-dark: #A06C20;
+    --brown: #5C3D1E;
+    --brown-light: #8B6040;
+    --text: #2C1810;
+    --text-light: #7A5C44;
+    --white: #FFFFFF;
+    --danger: #C0392B;
+    --success: #2E7D32;
+    --border: #E8D5B7;
+    --shadow: 0 2px 12px rgba(92,61,30,0.10);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+
+  /* ========= HEADER ========= */
+  header {
+    background: var(--brown);
+    color: var(--cream);
+    padding: 16px 20px 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  }
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    letter-spacing: 0.5px;
+  }
+  .header-date {
+    font-size: 13px;
+    color: var(--cream2);
+    margin-top: 2px;
+  }
+  .date-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .date-nav button {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: var(--cream);
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .date-nav button:active { background: rgba(255,255,255,0.3); }
+  .date-label {
+    font-size: 13px;
+    color: var(--cream2);
+    white-space: nowrap;
+  }
+
+  /* ========= MAIN ========= */
+  main {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  /* ========= CARDS ========= */
+  .card {
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-header {
+    background: var(--brown);
+    color: var(--cream);
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-body { padding: 14px 16px; }
+
+  /* ========= METRICS ========= */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .metric-box {
+    background: var(--cream);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+  }
+  .metric-label {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-bottom: 4px;
+  }
+  .metric-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--brown);
+  }
+  .metric-value.accent { color: var(--caramel-dark); }
+  .metric-unit { font-size: 12px; font-weight: 400; }
+  .metric-box.full { grid-column: 1 / -1; }
+
+  /* ========= INPUTS ========= */
+  .form-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .form-row:last-child { margin-bottom: 0; }
+  .form-label {
+    font-size: 13px;
+    color: var(--text-light);
+    min-width: 90px;
+    flex-shrink: 0;
+  }
+  input[type="number"], input[type="text"], textarea {
+    background: var(--cream);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 15px;
+    font-family: 'Noto Sans JP', sans-serif;
+    color: var(--text);
+    width: 100%;
+    -webkit-appearance: none;
+  }
+  input[type="number"]:focus, input[type="text"]:focus, textarea:focus {
+    outline: none;
+    border-color: var(--caramel);
+  }
+  textarea { resize: vertical; min-height: 70px; }
+
+  /* ========= SAVE BUTTON ========= */
+  .save-btn {
+    background: var(--caramel);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: 'Noto Sans JP', sans-serif;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+    transition: background 0.2s;
+  }
+  .save-btn:active { background: var(--caramel-dark); }
+
+  /* ========= CHECKLIST ========= */
+  .check-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .check-item:last-child { border-bottom: none; }
+  .check-item.done .check-text {
+    text-decoration: line-through;
+    color: #aaa;
+  }
+  .check-cb {
+    width: 22px; height: 22px;
+    border: 2px solid var(--caramel);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+    background: white;
+    transition: background 0.15s;
+  }
+  .check-cb.checked {
+    background: var(--caramel);
+    border-color: var(--caramel);
+  }
+  .check-cb.checked::after {
+    content: '✓';
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .check-text { font-size: 14px; flex: 1; }
+  .delete-btn {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .delete-btn:active { color: var(--danger); }
+
+  /* ========= ADD ITEM ========= */
+  .add-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .add-row input {
+    flex: 1;
+    font-size: 14px;
+  }
+  .add-btn {
+    background: var(--brown);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 20px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .add-btn:active { background: var(--caramel-dark); }
+
+  /* ========= RESERVATION ========= */
+  .res-item {
+    background: var(--cream);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .res-info { font-size: 14px; line-height: 1.5; flex: 1; }
+  .res-tag {
+    font-size: 11px;
+    background: var(--caramel);
+    color: white;
+    border-radius: 20px;
+    padding: 2px 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ========= HAZARD ========= */
+  .hazard-item {
+    background: #FFF5F5;
+    border: 1px solid #FFCDD2;
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .hazard-item .level {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .level-low { background: #FFF9C4; color: #795548; }
+  .level-mid { background: #FFE0B2; color: #E65100; }
+  .level-high { background: #FFCDD2; color: #B71C1C; }
+
+  /* ========= CONFIRM SECTION ========= */
+  .confirm-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .confirm-person {
+    background: var(--cream);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: border-color 0.15s;
+  }
+  .confirm-person.confirmed {
+    border-color: var(--success);
+    background: #F1F8E9;
+  }
+  .confirm-person .person-check {
+    width: 22px; height: 22px;
+    border: 2px solid #ccc;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .confirm-person.confirmed .person-check {
+    background: var(--success);
+    border-color: var(--success);
+    color: white;
+  }
+  .person-name { font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .person-time { font-size: 10px; color: var(--text-light); }
+  .confirm-memo {
+    flex: 1;
+    font-size: 13px;
+    font-family: 'Noto Sans JP', sans-serif;
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 8px;
+    color: var(--text);
+    min-width: 0;
+  }
+  .confirm-memo:focus { outline: none; border-color: var(--caramel); }
+  .confirm-pct-wrap {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .confirm-pct {
+    width: 52px;
+    font-size: 13px;
+    font-family: 'Noto Sans JP', sans-serif;
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 6px;
+    color: var(--text);
+    text-align: right;
+    -webkit-appearance: none;
+  }
+  .confirm-pct:focus { outline: none; border-color: var(--caramel); }
+
+  /* ========= WEEKLY TASK BADGE ========= */
+  .week-badge {
+    display: inline-block;
+    font-size: 10px;
+    background: var(--cream2);
+    color: var(--brown-light);
+    border-radius: 20px;
+    padding: 1px 7px;
+    margin-right: 4px;
+    font-weight: 700;
+  }
+
+  /* ========= TOAST ========= */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--brown);
+    color: var(--cream);
+    padding: 10px 22px;
+    border-radius: 30px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    transition: transform 0.3s ease;
+    z-index: 999;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ========= SHIPMENT ========= */
+  .ship-item {
+    background: var(--cream);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .ship-badge {
+    font-size: 11px;
+    background: var(--brown);
+    color: white;
+    border-radius: 20px;
+    padding: 2px 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ========= SECTION DIVIDER ========= */
+  .section-note {
+    font-size: 12px;
+    color: var(--text-light);
+    text-align: center;
+    padding: 4px 0;
+  }
+
+  .empty-msg {
+    text-align: center;
+    font-size: 13px;
+    color: #bbb;
+    padding: 12px 0;
+  }
+
+  /* ========= DAY CHIP ========= */
+  .day-chip {
+    background: var(--cream);
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: 'Noto Sans JP', sans-serif;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    user-select: none;
+  }
+  .day-chip.selected {
+    background: var(--caramel);
+    border-color: var(--caramel);
+    color: white;
+  }
+
+  /* ========= WEEKLY SETTINGS ITEM ========= */
+  .ws-item {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .ws-item-body { flex: 1; }
+  .ws-item-text { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .ws-item-days { display: flex; gap: 4px; flex-wrap: wrap; }
+
+  /* ========= MODAL ========= */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 200;
+    align-items: flex-end;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 20px 20px 0 0;
+    padding: 20px 16px 30px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .modal-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--brown);
+    margin-bottom: 14px;
+  }
+  .form-group { margin-bottom: 12px; }
+  .form-group label { font-size: 13px; color: var(--text-light); display: block; margin-bottom: 4px; }
+  select {
+    background: var(--cream);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 14px;
+    font-family: 'Noto Sans JP', sans-serif;
+    color: var(--text);
+    width: 100%;
+    -webkit-appearance: none;
+  }
+  .modal-btns { display: flex; gap: 8px; margin-top: 14px; }
+  .modal-btns button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    font-size: 15px;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-cancel { background: var(--cream2); color: var(--brown); }
+  .btn-submit { background: var(--caramel); color: white; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div>
+      <div class="header-title">🧀 日報 <span id="syncIndicator" style="font-size:11px;font-weight:400;opacity:0.7;margin-left:6px;"></span></div>
+      <div class="header-date" id="headerDate"></div>
+    </div>
+    <div class="date-nav">
+      <button onclick="changeDate(-1)">‹</button>
+      <span class="date-label" id="navDate"></span>
+      <button onclick="changeDate(1)">›</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ① 売上・来客・予算 -->
+  <div class="card">
+    <div class="card-header">📊 売上・来客数</div>
+    <div class="card-body">
+      <div class="form-row">
+        <span class="form-label">本日の予算</span>
+        <input type="number" id="budget" placeholder="0" oninput="saveSales()"> <span style="font-size:13px;color:var(--text-light);white-space:nowrap">円</span>
+      </div>
+      <div class="form-row">
+        <span class="form-label">前日の売上</span>
+        <input type="number" id="prevSales" placeholder="0" oninput="calcUnit()"> <span style="font-size:13px;color:var(--text-light);white-space:nowrap">円</span>
+      </div>
+      <div class="form-row">
+        <span class="form-label">前日の来客数</span>
+        <input type="number" id="prevGuests" placeholder="0" oninput="calcUnit()"> <span style="font-size:13px;color:var(--text-light);white-space:nowrap">人</span>
+      </div>
+      <div class="metrics-grid" style="margin-top:10px">
+        <div class="metric-box">
+          <div class="metric-label">前日 客単価</div>
+          <div class="metric-value accent" id="unitPrice">— <span class="metric-unit">円</span></div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">本日予算</div>
+          <div class="metric-value" id="budgetDisp">— <span class="metric-unit">円</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 全体の共有事項 -->
+  <div class="card" style="border:2.5px solid var(--caramel);">
+    <div class="card-header" style="background:var(--caramel);font-size:15px;padding:13px 16px;">
+      📢 全体の共有事項
+      <span onclick="toggleShareMode()" style="margin-left:auto;font-size:12px;background:rgba(255,255,255,0.25);padding:3px 10px;border-radius:20px;cursor:pointer;font-weight:700;" id="shareToggleBtn">✏️ 編集</span>
+    </div>
+    <!-- 閲覧モード -->
+    <div id="sharePreview" onclick="toggleShareMode()" style="padding:16px 18px;font-size:16px;line-height:1.85;white-space:pre-wrap;color:var(--text);min-height:90px;font-weight:500;background:#FFFDF5;cursor:pointer;border-radius:0 0 var(--radius) var(--radius);text-align:left;">
+      <span id="sharePreviewText" style="color:#bbb;font-style:italic;">（共有事項なし　タップして入力）</span>
+    </div>
+    <!-- 編集モード -->
+    <div id="shareEditArea" style="display:none;padding:12px 14px;background:#FFFDF5;border-radius:0 0 var(--radius) var(--radius);">
+      <textarea id="shareNote" placeholder="全員に共有したい内容を入力してください..." oninput="saveNote('shareNote');updateSharePreview()" style="min-height:180px;font-size:16px;line-height:1.8;background:#fff;border:2px solid var(--caramel);border-radius:10px;padding:12px 14px;font-weight:500;width:100%;"></textarea>
+      <button onclick="toggleShareMode()" style="margin-top:8px;background:var(--caramel);color:white;border:none;border-radius:8px;padding:11px;font-size:15px;font-weight:700;font-family:'Noto Sans JP',sans-serif;width:100%;cursor:pointer;">✓ 完了</button>
+    </div>
+  </div>
+
+  <!-- ⑤ 日次タスク -->
+  <div class="card">
+    <div class="card-header">✅ タスク（日次）</div>
+    <div class="card-body">
+      <div id="dailyTaskList"></div>
+      <div class="add-row">
+        <input type="text" id="dailyTaskInput" placeholder="本日のタスクを追加..." onkeydown="if(event.key==='Enter')addDailyTask()">
+        <button class="add-btn" onclick="addDailyTask()">＋</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑥ 週次タスク -->
+  <div class="card">
+    <div class="card-header">
+      🗓 タスク（週次）
+      <button onclick="openWeeklySettings()" style="margin-left:auto;background:rgba(255,255,255,0.2);border:none;color:white;font-size:12px;font-weight:700;font-family:'Noto Sans JP',sans-serif;padding:4px 12px;border-radius:20px;cursor:pointer;">⚙ 設定</button>
+    </div>
+    <div class="card-body">
+      <div class="section-note">毎週繰り返すタスク。チェックは当日のみリセット</div>
+      <div id="weeklyTaskList" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- ③ 予約確認 -->
+  <div class="card">
+    <div class="card-header">📅 予約確認</div>
+    <div class="card-body">
+      <div id="resList"></div>
+      <button class="save-btn" style="background:var(--brown)" onclick="openModal('res')">＋ 予約を追加</button>
+    </div>
+  </div>
+
+  <!-- ⑦ 発送物 -->
+  <div class="card">
+    <div class="card-header">🚚 発送物</div>
+    <div class="card-body">
+      <div id="shipList"></div>
+      <button class="save-btn" style="background:var(--brown)" onclick="openModal('ship')">＋ 発送物を追加</button>
+    </div>
+  </div>
+
+  <!-- ④ 発注リスト -->
+  <div class="card">
+    <div class="card-header">📦 発注リスト</div>
+    <div class="card-body">
+      <div id="orderList"></div>
+      <div class="add-row">
+        <input type="text" id="orderInput" placeholder="発注する商品名..." onkeydown="if(event.key==='Enter')addOrder()">
+        <button class="add-btn" onclick="addOrder()">＋</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 保管在庫リスト -->
+  <div class="card">
+    <div class="card-header">🏪 保管在庫リスト</div>
+    <div class="card-body">
+      <div id="stockList"></div>
+      <button class="save-btn" style="background:var(--brown);margin-top:4px;" onclick="openModal('stock')">＋ 在庫を追加</button>
+    </div>
+  </div>
+
+  <!-- ⑧ 日報確認 -->
+  <div class="card">
+    <div class="card-header">👤 日報確認</div>
+    <div class="card-body">
+      <!-- 共通メモ欄 -->
+      <div style="margin-bottom:10px;">
+        <div style="font-size:12px;color:var(--text-light);font-weight:700;margin-bottom:4px;">自由記述</div>
+        <input type="text" id="confirmSharedMemo" placeholder="全員共通のメモ..."
+          oninput="saveConfirmSharedMemo(this.value)"
+          style="width:100%;font-size:14px;background:var(--cream);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'Noto Sans JP',sans-serif;">
+      </div>
+      <!-- ヘッダー行 -->
+      <div style="display:flex;align-items:center;gap:8px;padding:0 2px 4px;border-bottom:1.5px solid var(--border);margin-bottom:6px;">
+        <div style="width:22px;flex-shrink:0;"></div>
+        <div style="flex:1;font-size:11px;font-weight:700;color:var(--text-light);">担当者</div>
+        <div style="width:64px;text-align:center;font-size:11px;font-weight:700;color:var(--text-light);">％</div>
+        <div style="width:24px;flex-shrink:0;"></div>
+      </div>
+      <div id="confirmGrid"></div>
+      <div class="section-note" style="margin-top:8px">タップで確認済みにする</div>
+      <div class="add-row" style="margin-top:10px;">
+        <input type="text" id="staffInput" placeholder="担当者名を追加..." onkeydown="if(event.key==='Enter')addStaff()">
+        <button class="add-btn" onclick="addStaff()">＋</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑨ ヒヤリハット -->
+  <div class="card">
+    <div class="card-header" style="background:#B71C1C">⚠️ ヒヤリハット</div>
+    <div class="card-body">
+      <div id="hazardList"></div>
+      <button class="save-btn" style="background:#C62828" onclick="openModal('hazard')">＋ 記録を追加</button>
+    </div>
+  </div>
+
+</main>
+
+<!-- ========= 削除確認モーダル ========= -->
+<div class="modal-overlay" id="deleteConfirmOverlay" style="display:none;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:20px;padding:24px 20px;width:88%;max-width:340px;text-align:center;">
+    <div style="font-size:28px;margin-bottom:10px;">⚠️</div>
+    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;" id="deleteConfirmMsg">削除しますか？</div>
+    <div style="font-size:13px;color:var(--text-light);margin-bottom:20px;">この操作は取り消せません。</div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="closeDeleteConfirm()" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--cream2);color:var(--brown);font-size:15px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;">キャンセル</button>
+      <button id="deleteConfirmBtn" style="flex:1;padding:12px;border-radius:10px;border:none;background:#C62828;color:white;font-size:15px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;">削除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========= TOAST ========= -->
+<div class="toast" id="toast"></div>
+
+<!-- ========= MODAL ========= -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal" id="modal"></div>
+</div>
+
+<!-- 週次タスク設定モーダル -->
+<div class="modal-overlay" id="weeklySettingsOverlay" onclick="closeWeeklySettingsOutside(event)" style="display:none;align-items:flex-end;">
+  <div class="modal" id="weeklySettingsModal" style="max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div class="modal-title" style="margin-bottom:0;">⚙ 週次タスク設定</div>
+      <button onclick="closeWeeklySettings()" style="background:none;border:none;font-size:22px;color:#aaa;cursor:pointer;line-height:1;">×</button>
+    </div>
+    <div id="weeklySettingsList"></div>
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
+      <div style="font-size:13px;color:var(--text-light);margin-bottom:8px;font-weight:700;">新しいタスクを追加</div>
+      <div class="form-group">
+        <label>タスク名</label>
+        <input type="text" id="ws_text" placeholder="タスク内容を入力...">
+      </div>
+      <div class="form-group">
+        <label>実施する曜日（複数選択可）</label>
+        <div id="ws_days" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+          <button type="button" class="day-chip" data-day="月" onclick="toggleDayChip(this)">月</button>
+          <button type="button" class="day-chip" data-day="火" onclick="toggleDayChip(this)">火</button>
+          <button type="button" class="day-chip" data-day="水" onclick="toggleDayChip(this)">水</button>
+          <button type="button" class="day-chip" data-day="木" onclick="toggleDayChip(this)">木</button>
+          <button type="button" class="day-chip" data-day="金" onclick="toggleDayChip(this)">金</button>
+          <button type="button" class="day-chip" data-day="土" onclick="toggleDayChip(this)">土</button>
+          <button type="button" class="day-chip" data-day="日" onclick="toggleDayChip(this)">日</button>
+        </div>
+      </div>
+      <button onclick="addWeeklyTaskFromSettings()" style="background:var(--caramel);color:white;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:700;font-family:'Noto Sans JP',sans-serif;width:100%;cursor:pointer;">＋ 追加</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================
+// STATE
+// ============================
+// STAFFはlocalStorageで管理（loadDataで初期化）
+const WEEKLY_DAYS = ['月', '火', '水', '木', '金', '土', '日'];
+
+let currentDate = todayStr();
+let data = {}; // keyed by date
+
+function toLocalDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function todayStr() {
+  return toLocalDateStr(new Date());
+}
+
+function getDateLabel(ds) {
+  const d = new Date(ds + 'T00:00:00');
+  const days = ['日','月','火','水','木','金','土'];
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${days[d.getDay()]}）`;
+}
+
+function getDayOfWeek(ds) {
+  const d = new Date(ds + 'T00:00:00');
+  return ['日','月','火','水','木','金','土'][d.getDay()];
+}
+
+// ============================
+// STORAGE
+// ============================
+// ============================
+// FIREBASE 同期
+// ============================
+let _saveTimer = null;
+let _saveWeeklyTimer = null;
+let _saveStaffTimer = null;
+
+function loadData() {
+  // Firebase リアルタイムリスナーで全データを受信
+  window._fbListen('reportData', val => {
+    data = val || {};
+    renderAll();
+  });
+  window._fbListen('weeklyTasks', val => {
+    window.weeklyTasks = val ? Object.values(val) : defaultWeeklyTasks();
+    renderWeeklyTasks();
+  });
+  window._fbListen('staffList', val => {
+    window.staffList = val || ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
+    renderConfirm();
+  });
+}
+
+function saveStaff() {
+  clearTimeout(_saveStaffTimer);
+  _saveStaffTimer = setTimeout(() => {
+    window._fbSet('staffList', window.staffList);
+  }, 300);
+}
+
+function addStaff() {
+  const inp = document.getElementById('staffInput');
+  const name = inp.value.trim();
+  if (!name) return;
+  if (window.staffList.includes(name)) { showToast('すでに登録されています'); return; }
+  window.staffList.push(name);
+  saveStaff();
+  inp.value = '';
+  renderConfirm();
+  showToast(`${name} を追加しました`);
+}
+
+function deleteStaff(name) {
+  window.staffList = window.staffList.filter(s => s !== name);
+  saveStaff();
+  renderConfirm();
+  showToast(`${name} を削除しました`);
+}
+
+function saveData() {
+  // デバウンス：連続入力時は300ms待ってから1回だけ書き込む
+  clearTimeout(_saveTimer);
+  const ind = document.getElementById('syncIndicator');
+  if (ind) ind.textContent = '同期中...';
+  _saveTimer = setTimeout(() => {
+    window._fbSet('reportData', data).then(() => {
+      if (ind) ind.textContent = '✓ 保存済';
+      setTimeout(() => { if (ind) ind.textContent = ''; }, 2000);
+    }).catch(() => {
+      if (ind) ind.textContent = '⚠ 保存失敗';
+    });
+  }, 300);
+}
+
+function saveWeeklyTasks() {
+  clearTimeout(_saveWeeklyTimer);
+  _saveWeeklyTimer = setTimeout(() => {
+    // 配列をオブジェクト形式に変換（Firebaseは配列よりオブジェクトが安定）
+    const obj = {};
+    window.weeklyTasks.forEach((t, i) => { obj[t.id || i] = t; });
+    window._fbSet('weeklyTasks', obj);
+  }, 300);
+}
+
+function defaultWeeklyTasks() {
+  return [
+    { id: 'w1', text: '冷蔵ケースの拭き掃除', days: ['月','木'] },
+    { id: 'w2', text: '在庫の棚卸', days: ['月'] },
+    { id: 'w3', text: '冷凍庫の整理', days: ['水'] },
+    { id: 'w4', text: '店頭POPの確認・交換', days: ['金'] },
+    { id: 'w5', text: '翌週の予約確認', days: ['金'] },
+  ];
+}
+
+function getDay() {
+  if (!data[currentDate]) {
+    data[currentDate] = {
+      budget: '', prevSales: '', prevGuests: '', shareNote: '',
+      orders: [], dailyTasks: [], reservations: [], shipments: [],
+      stocks: [],
+      confirms: {}, hazards: [], weeklyChecked: {}
+    };
+    saveData();
+  }
+  return data[currentDate];
+}
+
+// 表示用：当日データ＋過去の未チェック項目を動的にマージして返す
+function getMergedOrders() {
+  const today = getDay();
+  const todayIds = new Set(today.orders.map(o => o.id));
+  const carried = [];
+  const seenIds = new Set(todayIds);
+  Object.keys(data)
+    .filter(d => d < currentDate)
+    .sort()
+    .forEach(d => {
+      (data[d].orders || []).forEach(o => {
+        if (!o.done && !seenIds.has(o.id)) {
+          seenIds.add(o.id);
+          carried.push({ ...o, _carried: true });
+        }
+      });
+    });
+  return [...carried, ...today.orders];
+}
+
+function getMergedDailyTasks() {
+  const today = getDay();
+  const todayIds = new Set(today.dailyTasks.map(t => t.id));
+  const carried = [];
+  const seenIds = new Set(todayIds);
+  Object.keys(data)
+    .filter(d => d < currentDate)
+    .sort()
+    .forEach(d => {
+      (data[d].dailyTasks || []).forEach(t => {
+        if (!t.done && !seenIds.has(t.id)) {
+          seenIds.add(t.id);
+          carried.push({ ...t, _carried: true });
+        }
+      });
+    });
+  return [...carried, ...today.dailyTasks];
+}
+
+// 繰越アイテムの操作は元の日付のデータを更新する
+function findItemDate(id, listKey) {
+  if ((data[currentDate][listKey] || []).find(o => o.id === id)) return currentDate;
+  return Object.keys(data)
+    .filter(d => d < currentDate)
+    .find(d => (data[d][listKey] || []).find(o => o.id === id)) || null;
+}
+
+function getMergedShipments() {
+  const today = getDay();
+  const todayIds = new Set(today.shipments.map(s => s.id));
+  const carried = [];
+  const seenIds = new Set(todayIds);
+  Object.keys(data)
+    .filter(d => d < currentDate)
+    .sort()
+    .forEach(d => {
+      (data[d].shipments || []).forEach(s => {
+        // 箱詰め・伝票が両方済なら完了とみなし繰越しない
+        if (!(s.boxed && s.labeled) && !seenIds.has(s.id)) {
+          seenIds.add(s.id);
+          carried.push({ ...s, _carried: true });
+        }
+      });
+    });
+  return [...carried, ...today.shipments];
+}
+
+// ============================
+// DATE NAV
+// ============================
+function changeDate(delta) {
+  const d = new Date(currentDate + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  currentDate = toLocalDateStr(d);
+  renderAll();
+}
+
+function updateHeader() {
+  const label = getDateLabel(currentDate);
+  document.getElementById('headerDate').textContent = label;
+  document.getElementById('navDate').textContent = currentDate === todayStr() ? '今日' : currentDate.slice(5).replace('-', '/');
+}
+
+// ============================
+// SALES / METRICS
+// ============================
+function calcUnit() {
+  const d = getDay();
+  d.prevSales = +document.getElementById('prevSales').value || 0;
+  d.prevGuests = +document.getElementById('prevGuests').value || 0;
+  const unit = d.prevGuests > 0 ? Math.round(d.prevSales / d.prevGuests) : 0;
+  document.getElementById('unitPrice').innerHTML = d.prevGuests > 0
+    ? `${unit.toLocaleString()} <span class="metric-unit">円</span>`
+    : `— <span class="metric-unit">円</span>`;
+  saveData();
+}
+
+function saveSales() {
+  const d = getDay();
+  d.budget = +document.getElementById('budget').value || 0;
+  const b = d.budget;
+  document.getElementById('budgetDisp').innerHTML = b
+    ? `${b.toLocaleString()} <span class="metric-unit">円</span>`
+    : `— <span class="metric-unit">円</span>`;
+  saveData();
+}
+
+function saveNote(key) {
+  const d = getDay();
+  d[key] = document.getElementById(key).value;
+  saveData();
+}
+
+function toggleShareMode() {
+  const preview = document.getElementById('sharePreview');
+  const editArea = document.getElementById('shareEditArea');
+  const btn = document.getElementById('shareToggleBtn');
+  const isEditing = editArea.style.display !== 'none';
+  if (isEditing) {
+    editArea.style.display = 'none';
+    preview.style.display = 'block';
+    btn.textContent = '✏️ 編集';
+  } else {
+    editArea.style.display = 'block';
+    preview.style.display = 'none';
+    btn.textContent = '✓ 完了';
+    document.getElementById('shareNote').focus();
+  }
+}
+
+function updateSharePreview() {
+  const text = document.getElementById('shareNote').value.trim();
+  const el = document.getElementById('sharePreviewText');
+  if (text) {
+    el.style.color = 'var(--text)';
+    el.style.fontStyle = 'normal';
+    el.textContent = text;
+  } else {
+    el.style.color = '#bbb';
+    el.style.fontStyle = 'italic';
+    el.textContent = '（共有事項なし　タップして入力）';
+  }
+}
+
+// ============================
+// ORDERS
+// ============================
+function addOrder() {
+  const inp = document.getElementById('orderInput');
+  const text = inp.value.trim();
+  if (!text) return;
+  const d = getDay();
+  d.orders.push({ id: Date.now(), text, done: false });
+  inp.value = '';
+  saveData();
+  renderOrders();
+}
+
+function toggleOrder(id) {
+  const dateKey = findItemDate(id, 'orders');
+  if (!dateKey) return;
+  const item = data[dateKey].orders.find(o => o.id === id);
+  if (item) item.done = !item.done;
+  saveData();
+  renderOrders();
+}
+
+function deleteOrder(id) {
+  const dateKey = findItemDate(id, 'orders');
+  if (!dateKey) return;
+  data[dateKey].orders = data[dateKey].orders.filter(o => o.id !== id);
+  saveData();
+  renderOrders();
+}
+
+function renderOrders() {
+  const items = getMergedOrders();
+  const el = document.getElementById('orderList');
+  if (!items.length) { el.innerHTML = '<div class="empty-msg">発注リストはありません</div>'; return; }
+  el.innerHTML = items.map(o => `
+    <div class="check-item ${o.done ? 'done' : ''}">
+      <div class="check-cb ${o.done ? 'checked' : ''}" onclick="toggleOrder(${o.id})"></div>
+      <span class="check-text">${o._carried ? '<span style="font-size:11px;color:var(--danger);margin-right:4px;font-weight:700;">繰越</span>' : ''}${esc(o.text)}</span>
+      <button class="delete-btn" onclick="deleteOrder(${o.id})">×</button>
+    </div>`).join('');
+}
+
+// ============================
+// DAILY TASKS
+// ============================
+function addDailyTask() {
+  const inp = document.getElementById('dailyTaskInput');
+  const text = inp.value.trim();
+  if (!text) return;
+  const d = getDay();
+  d.dailyTasks.push({ id: Date.now(), text, done: false });
+  inp.value = '';
+  saveData();
+  renderDailyTasks();
+}
+
+function toggleDailyTask(id) {
+  const dateKey = findItemDate(id, 'dailyTasks');
+  if (!dateKey) return;
+  const item = data[dateKey].dailyTasks.find(t => t.id === id);
+  if (item) item.done = !item.done;
+  saveData();
+  renderDailyTasks();
+}
+
+function deleteDailyTask(id) {
+  const dateKey = findItemDate(id, 'dailyTasks');
+  if (!dateKey) return;
+  data[dateKey].dailyTasks = data[dateKey].dailyTasks.filter(t => t.id !== id);
+  saveData();
+  renderDailyTasks();
+}
+
+function renderDailyTasks() {
+  const items = getMergedDailyTasks();
+  const el = document.getElementById('dailyTaskList');
+  if (!items.length) { el.innerHTML = '<div class="empty-msg">タスクはありません</div>'; return; }
+  el.innerHTML = items.map(t => `
+    <div class="check-item ${t.done ? 'done' : ''}">
+      <div class="check-cb ${t.done ? 'checked' : ''}" onclick="toggleDailyTask(${t.id})"></div>
+      <span class="check-text">${t._carried ? '<span style="font-size:11px;color:var(--danger);margin-right:4px;font-weight:700;">繰越</span>' : ''}${esc(t.text)}</span>
+      <button class="delete-btn" onclick="deleteDailyTask(${t.id})">×</button>
+    </div>`).join('');
+}
+
+// ============================
+// WEEKLY TASKS
+// ============================
+function toggleWeeklyTask(id) {
+  const d = getDay();
+  if (!d.weeklyChecked) d.weeklyChecked = {};
+  d.weeklyChecked[id] = !d.weeklyChecked[id];
+  saveData();
+  renderWeeklyTasks();
+}
+
+function deleteWeeklyTask(id) {
+  window.weeklyTasks = window.weeklyTasks.filter(t => t.id !== id);
+  saveWeeklyTasks();
+  renderWeeklyTasks();
+  renderWeeklySettingsList();
+}
+
+// ============================
+// WEEKLY SETTINGS MODAL
+// ============================
+function toggleDayChip(btn) {
+  btn.classList.toggle('selected');
+}
+
+function openWeeklySettings() {
+  // 入力欄リセット
+  document.getElementById('ws_text').value = '';
+  document.querySelectorAll('#ws_days .day-chip').forEach(c => c.classList.remove('selected'));
+  renderWeeklySettingsList();
+  document.getElementById('weeklySettingsOverlay').style.display = 'flex';
+}
+
+function closeWeeklySettings() {
+  document.getElementById('weeklySettingsOverlay').style.display = 'none';
+  renderWeeklyTasks(); // TOP画面も更新
+}
+
+function closeWeeklySettingsOutside(e) {
+  if (e.target === document.getElementById('weeklySettingsOverlay')) closeWeeklySettings();
+}
+
+function renderWeeklySettingsList() {
+  const el = document.getElementById('weeklySettingsList');
+  const allDays = ['月','火','水','木','金','土','日'];
+  if (!window.weeklyTasks.length) {
+    el.innerHTML = '<div class="empty-msg" style="margin-bottom:8px;">週次タスクはまだありません</div>';
+    return;
+  }
+  el.innerHTML = window.weeklyTasks.map(t => `
+    <div class="ws-item">
+      <div class="ws-item-body">
+        <div class="ws-item-text">${esc(t.text)}</div>
+        <div class="ws-item-days">
+          ${allDays.map(day => `
+            <span onclick="toggleTaskDay('${t.id}','${day}')"
+              style="display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;border-radius:20px;cursor:pointer;border:1.5px solid ${t.days.includes(day) ? 'var(--caramel)' : 'var(--border)'};background:${t.days.includes(day) ? 'var(--caramel)' : 'var(--cream)'};color:${t.days.includes(day) ? 'white' : 'var(--text-light)'};">
+              ${day}
+            </span>`).join('')}
+        </div>
+      </div>
+      <button onclick="deleteWeeklyTask('${t.id}')" style="background:none;border:none;color:#ccc;font-size:20px;cursor:pointer;padding:0;line-height:1;flex-shrink:0;">×</button>
+    </div>`).join('');
+}
+
+function toggleTaskDay(id, day) {
+  const task = window.weeklyTasks.find(t => t.id === id);
+  if (!task) return;
+  if (task.days.includes(day)) {
+    if (task.days.length === 1) return; // 最低1曜日は必要
+    task.days = task.days.filter(d => d !== day);
+  } else {
+    task.days.push(day);
+  }
+  saveWeeklyTasks();
+  renderWeeklySettingsList();
+}
+
+function addWeeklyTaskFromSettings() {
+  const text = document.getElementById('ws_text').value.trim();
+  if (!text) { alert('タスク名を入力してください'); return; }
+  const days = [...document.querySelectorAll('#ws_days .day-chip.selected')].map(b => b.dataset.day);
+  if (!days.length) { alert('曜日を1つ以上選択してください'); return; }
+  window.weeklyTasks.push({ id: 'w' + Date.now(), text, days });
+  saveWeeklyTasks();
+  renderWeeklySettingsList();
+  // リセット
+  document.getElementById('ws_text').value = '';
+  document.querySelectorAll('#ws_days .day-chip').forEach(c => c.classList.remove('selected'));
+  showToast('週次タスクを追加しました');
+}
+
+function renderWeeklyTasks() {
+  const d = getDay();
+  const dow = getDayOfWeek(currentDate);
+
+  // 今日の曜日に対応する週次タスクを取得
+  // さらに、直近の同曜日でチェックされていなかったタスクも表示
+  const todayTasks = window.weeklyTasks.filter(t => t.days.includes(dow));
+
+  // 直近7日以内で同曜日に表示されるべきだったタスクで未チェックのものも拾う
+  const extraTasks = [];
+  window.weeklyTasks.forEach(t => {
+    if (t.days.includes(dow)) return; // 今日の曜日は既に含む
+    // 直近7日の過去日をチェック
+    for (let i = 1; i <= 6; i++) {
+      const pd = new Date(currentDate + 'T00:00:00');
+      pd.setDate(pd.getDate() - i);
+      const pdStr = toLocalDateStr(pd);
+      const pdDow = getDayOfWeek(pdStr);
+      if (t.days.includes(pdDow)) {
+        // その日のデータが存在し、かつ未チェックなら引き継ぎ
+        if (data[pdStr] && !( data[pdStr].weeklyChecked && data[pdStr].weeklyChecked[t.id] )) {
+          if (!extraTasks.find(e => e.id === t.id)) extraTasks.push(t);
+        }
+        break;
+      }
+    }
+  });
+
+  const allTasks = [...todayTasks, ...extraTasks];
+  const el = document.getElementById('weeklyTaskList');
+  if (!allTasks.length) {
+    el.innerHTML = '<div class="empty-msg">本日（' + dow + '曜）の週次タスクはありません</div>';
+    return;
+  }
+  el.innerHTML = allTasks.map(t => {
+    const done = d.weeklyChecked && d.weeklyChecked[t.id];
+    const isCarryOver = !t.days.includes(dow);
+    return `
+    <div class="check-item ${done ? 'done' : ''}">
+      <div class="check-cb ${done ? 'checked' : ''}" onclick="toggleWeeklyTask('${t.id}')"></div>
+      <span class="check-text">
+        ${t.days.map(day => `<span class="week-badge">${day}</span>`).join('')}${isCarryOver ? '<span style="font-size:11px;color:var(--danger);margin-right:4px;">繰越</span>' : ''}${esc(t.text)}
+      </span>
+    </div>`;
+  }).join('');
+}
+
+// ============================
+// RESERVATIONS
+// ============================
+function renderReservations() {
+  const d = getDay();
+  const el = document.getElementById('resList');
+  if (!d.reservations.length) { el.innerHTML = '<div class="empty-msg">予約はありません</div>'; return; }
+  el.innerHTML = d.reservations.map(r => {
+    const itemsHtml = (r.items && r.items.length)
+      ? r.items.map(i => `<span style="display:inline-block;background:var(--cream2);border-radius:6px;padding:2px 8px;font-size:12px;margin:2px 2px 0 0;">${esc(i.product)} × ${esc(i.qty)}</span>`).join('')
+      : (r.note ? `<span style="font-size:13px;color:var(--text-light)">${esc(r.note)}</span>` : '<span style="font-size:12px;color:#bbb">商品なし</span>');
+    return `
+    <div class="res-item">
+      <div class="res-info">
+        <strong>${esc(r.name)}</strong> 様　🕐 ${esc(r.time)}<br>
+        <div style="margin-top:5px">${itemsHtml}</div>
+      </div>
+      <button class="delete-btn" style="font-size:14px;align-self:flex-start" onclick="deleteReservation(${r.id})">削除</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteReservation(id) {
+  const d = getDay();
+  d.reservations = d.reservations.filter(r => r.id !== id);
+  saveData(); renderReservations();
+}
+
+// ============================
+// SHIPMENTS
+// ============================
+function renderShipments() {
+  const el = document.getElementById('shipList');
+  const items = getMergedShipments();
+  if (!items.length) { el.innerHTML = '<div class="empty-msg">発送物はありません</div>'; return; }
+  el.innerHTML = items.map(s => {
+    const arrivalLabel = s.arrival ? (() => {
+      const dt = new Date(s.arrival + 'T00:00:00');
+      return `${dt.getMonth()+1}月${dt.getDate()}日着`;
+    })() : '';
+    // items配列（新形式）と旧形式（contents/qty）の両対応
+    const itemsHtml = (s.items && s.items.length)
+      ? s.items.map(i => `<span style="display:inline-block;background:var(--cream2);border-radius:6px;padding:2px 8px;font-size:13px;margin:2px 2px 0 0;">🧀 ${esc(i.name)} × ${esc(i.qty)}</span>`).join('')
+      : `<span style="font-size:13px;color:var(--text-light);">🧀 ${esc(s.contents || '')}${s.qty ? ` × ${s.qty}` : ''}</span>`;
+    const allDone = s.boxed && s.labeled;
+    return `
+    <div class="ship-item" style="flex-direction:column;align-items:stretch;gap:10px;${allDone ? 'opacity:0.55;' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+            <strong style="font-size:15px;">${esc(s.dest)}</strong>
+            ${s._carried ? '<span style="font-size:11px;color:var(--danger);font-weight:700;background:#FFF0F0;border-radius:20px;padding:2px 8px;">繰越</span>' : ''}
+            ${arrivalLabel ? `<span style="font-size:12px;background:#FFF3E0;color:#E65100;border-radius:20px;padding:2px 9px;font-weight:700;">📅 ${esc(arrivalLabel)}</span>` : ''}
+          </div>
+          <div>${itemsHtml}</div>
+          <div style="margin-top:6px;">
+            <textarea
+              placeholder="📝 備考を入力..."
+              oninput="updateShipNote(${s.id}, this.value)"
+              style="width:100%;font-size:13px;color:var(--text-light);background:var(--cream);border:1.5px solid var(--border);border-radius:6px;padding:6px 8px;resize:none;font-family:'Noto Sans JP',sans-serif;min-height:38px;line-height:1.5;overflow:hidden;"
+              rows="1"
+              oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';updateShipNote(${s.id}, this.value)"
+            >${esc(s.note || '')}</textarea>
+          </div>
+        </div>
+        <button class="delete-btn" style="font-size:13px;color:#ccc;flex-shrink:0;" onclick="deleteShipment(${s.id})">削除</button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="toggleShipStatus(${s.id},'boxed')" style="flex:1;padding:9px 6px;border-radius:10px;font-size:13px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;transition:all 0.15s;border:1.5px solid ${s.boxed ? 'var(--success)' : 'var(--border)'};background:${s.boxed ? '#E8F5E9' : 'var(--cream)'};color:${s.boxed ? 'var(--success)' : 'var(--text-light)'};">
+          📦 箱詰め<br><span style="font-size:15px;">${s.boxed ? '✅ 済' : '⬜ 未'}</span>
+        </button>
+        <button onclick="toggleShipStatus(${s.id},'labeled')" style="flex:1;padding:9px 6px;border-radius:10px;font-size:13px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;transition:all 0.15s;border:1.5px solid ${s.labeled ? 'var(--success)' : 'var(--border)'};background:${s.labeled ? '#E8F5E9' : 'var(--cream)'};color:${s.labeled ? 'var(--success)' : 'var(--text-light)'};">
+          🏷 伝票<br><span style="font-size:15px;">${s.labeled ? '✅ 済' : '⬜ 未'}</span>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteShipment(id) {
+  const dateKey = findItemDate(id, 'shipments');
+  if (!dateKey) return;
+  data[dateKey].shipments = data[dateKey].shipments.filter(s => s.id !== id);
+  saveData(); renderShipments();
+}
+
+// ============================
+// CONFIRM
+// ============================
+function renderConfirm() {
+  const d = getDay();
+  const el = document.getElementById('confirmGrid');
+  // 共通メモの表示
+  const memoEl = document.getElementById('confirmSharedMemo');
+  if (memoEl) memoEl.value = d.confirmSharedMemo || '';
+
+  el.innerHTML = window.staffList.map(name => {
+    const info = d.confirms[name];
+    const confirmed = !!(info && info.time);
+    const pct = info ? (info.pct || '') : '';
+    const safeName = name.replace(/'/g, "\'");
+    return `
+    <div class="confirm-person ${confirmed ? 'confirmed' : ''}">
+      <div class="person-check ${confirmed ? 'confirmed' : ''}" onclick="toggleConfirm('${safeName}')">${confirmed ? '✓' : ''}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="person-name">${esc(name)}</div>
+        <div class="person-time">${confirmed ? info.time : '未確認'}</div>
+      </div>
+      <div class="confirm-pct-wrap">
+        <input class="confirm-pct" type="number" placeholder="--" min="0" max="100" value="${esc(String(pct))}"
+          oninput="updateConfirmField('${safeName}','pct',this.value)">
+        <span style="font-size:13px;color:var(--text-light);font-weight:600;">%</span>
+      </div>
+      <button onclick="deleteStaff('${safeName}')" style="background:none;border:none;color:#ddd;font-size:16px;cursor:pointer;line-height:1;padding:2px 4px;flex-shrink:0;">×</button>
+    </div>`;
+  }).join('');
+}
+
+function toggleConfirm(name) {
+  const d = getDay();
+  const existing = d.confirms[name] || {};
+  if (existing.time) {
+    // チェック解除：%は保持
+    d.confirms[name] = { pct: existing.pct || '' };
+  } else {
+    const now = new Date();
+    d.confirms[name] = {
+      time: `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')} 確認`,
+      pct: existing.pct || ''
+    };
+  }
+  saveData(); renderConfirm();
+  showToast(d.confirms[name].time ? `${name} さんが確認しました ✓` : `${name} さんの確認を解除`);
+}
+
+function saveConfirmSharedMemo(value) {
+  const d = getDay();
+  d.confirmSharedMemo = value;
+  saveData();
+}
+
+function updateConfirmField(name, field, value) {
+  const d = getDay();
+  if (!d.confirms[name]) d.confirms[name] = { pct: '' };
+  d.confirms[name][field] = value;
+  saveData();
+}
+
+// ============================
+// HAZARD
+// ============================
+function renderHazards() {
+  const d = getDay();
+  const el = document.getElementById('hazardList');
+  if (!d.hazards.length) { el.innerHTML = '<div class="empty-msg">記録はありません</div>'; return; }
+  const levelClass = { '軽微': 'level-low', '中程度': 'level-mid', '重大': 'level-high' };
+  el.innerHTML = d.hazards.map(h => `
+    <div class="hazard-item">
+      <div style="flex:1">
+        <div style="font-weight:700;margin-bottom:3px">${esc(h.category)}</div>
+        <div style="font-size:13px;color:var(--text-light)">${esc(h.content)}</div>
+        ${h.action ? `<div style="font-size:12px;margin-top:3px;color:#555">対応：${esc(h.action)}</div>` : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        <span class="level ${levelClass[h.level] || 'level-low'}">${esc(h.level)}</span>
+        <button class="delete-btn" style="font-size:14px" onclick="deleteHazard(${h.id})">削除</button>
+      </div>
+    </div>`).join('');
+}
+
+function deleteHazard(id) {
+  const d = getDay();
+  d.hazards = d.hazards.filter(h => h.id !== id);
+  saveData(); renderHazards();
+}
+
+// ============================
+// MODALS
+// ============================
+let currentModal = null;
+
+function openModal(type) {
+  currentModal = type;
+  const modal = document.getElementById('modal');
+  let html = '';
+  if (type === 'res') {
+    html = `
+      <div class="modal-title">📅 予約を追加</div>
+      <div class="form-group"><label>お名前</label><input type="text" id="m_name" placeholder="山田 太郎"></div>
+      <div class="form-group"><label>時間</label><input type="text" id="m_time" placeholder="14:00"></div>
+      <div class="form-group">
+        <label>受け取り商品</label>
+        <div id="m_items">
+          <div class="res-item-row" style="display:flex;gap:8px;margin-bottom:8px;">
+            <input type="text" placeholder="商品名（例：プレーン）" style="flex:2;font-size:14px;">
+            <input type="number" placeholder="個数" min="1" style="flex:1;font-size:14px;">
+            <button onclick="removeResItemRow(this)" style="background:none;border:none;color:#ccc;font-size:20px;cursor:pointer;padding:0 4px;">×</button>
+          </div>
+        </div>
+        <button onclick="addResItemRow()" style="background:var(--cream2);border:1.5px dashed var(--caramel);border-radius:8px;color:var(--caramel-dark);font-size:14px;font-weight:700;font-family:'Noto Sans JP',sans-serif;padding:8px;width:100%;cursor:pointer;margin-top:2px;">＋ 商品を追加</button>
+      </div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+        <button class="btn-submit" onclick="submitRes()">追加</button>
+      </div>`;
+  } else if (type === 'ship') {
+    html = `
+      <div class="modal-title">🚚 発送物を追加</div>
+      <div class="form-group"><label>送付先</label><input type="text" id="m_dest" placeholder="○○様"></div>
+      <div class="form-group">
+        <label>内容物</label>
+        <div id="m_ship_items">
+          <div class="ship-item-row" style="display:flex;gap:8px;margin-bottom:8px;">
+            <input type="text" placeholder="商品名（例：プレーン）" style="flex:2;font-size:14px;background:var(--cream);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);">
+            <input type="number" placeholder="個数" min="1" style="flex:1;font-size:14px;background:var(--cream);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);">
+            <button type="button" onclick="removeShipItemRow(this)" style="background:none;border:none;color:#ccc;font-size:20px;cursor:pointer;padding:0 4px;line-height:1;">×</button>
+          </div>
+        </div>
+        <button type="button" onclick="addShipItemRow()" style="background:var(--cream2);border:1.5px dashed var(--caramel);border-radius:8px;color:var(--caramel-dark);font-size:14px;font-weight:700;font-family:'Noto Sans JP',sans-serif;padding:8px;width:100%;cursor:pointer;">＋ 内容物を追加</button>
+      </div>
+      <div class="form-group"><label>〇日着（着日指定）</label><input type="date" id="m_arrival"></div>
+      <div class="form-group"><label>備考</label><textarea id="m_ship_note" placeholder="自由記述..." style="min-height:60px;"></textarea></div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+        <button class="btn-submit" onclick="submitShip()">追加</button>
+      </div>`;
+  } else if (type === 'hazard') {
+    html = `
+      <div class="modal-title">⚠️ ヒヤリハット記録</div>
+      <div class="form-group"><label>カテゴリ</label>
+        <select id="m_cat">
+          <option>衛生・食品安全</option><option>設備・機器</option><option>転倒・怪我</option><option>接客トラブル</option><option>その他</option>
+        </select>
+      </div>
+      <div class="form-group"><label>レベル</label>
+        <select id="m_level"><option>軽微</option><option>中程度</option><option>重大</option></select>
+      </div>
+      <div class="form-group"><label>内容</label><textarea id="m_content" placeholder="発生した状況を記入..."></textarea></div>
+      <div class="form-group"><label>対応・措置</label><textarea id="m_action" placeholder="取った対応を記入..."></textarea></div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+        <button class="btn-submit" onclick="submitHazard()">記録</button>
+      </div>`;
+  } else if (type === 'stock') {
+    html = `
+      <div class="modal-title">🏪 在庫を追加</div>
+      <div class="form-group"><label>商品名</label><input type="text" id="m_stock_name" placeholder="例：プレーンチーズケーキ"></div>
+      <div class="form-group">
+        <label>個数 / ケース数</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="number" id="m_stock_qty" placeholder="0" min="0" style="flex:1;">
+          <select id="m_stock_unit" style="flex:1;">
+            <option value="個">個</option>
+            <option value="ケース">ケース</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>保管場所</label><input type="text" id="m_stock_location" placeholder="例：冷蔵庫A・冷凍庫"></div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+        <button class="btn-submit" onclick="submitStock()">追加</button>
+      </div>`;
+  }
+  modal.innerHTML = html;
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('active');
+}
+
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+
+function addResItemRow() {
+  const container = document.getElementById('m_items');
+  const row = document.createElement('div');
+  row.className = 'res-item-row';
+  row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;';
+  row.innerHTML = `
+    <input type="text" placeholder="商品名（例：プレーン）" style="flex:2;font-size:14px;background:var(--cream);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);">
+    <input type="number" placeholder="個数" min="1" style="flex:1;font-size:14px;background:var(--cream);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);">
+    <button onclick="removeResItemRow(this)" style="background:none;border:none;color:#ccc;font-size:20px;cursor:pointer;padding:0 4px;">×</button>`;
+  container.appendChild(row);
+}
+
+function removeResItemRow(btn) {
+  const rows = document.querySelectorAll('.res-item-row');
+  if (rows.length <= 1) { return; } // 最低1行は残す
+  btn.closest('.res-item-row').remove();
+}
+
+function submitRes() {
+  const name = document.getElementById('m_name').value.trim();
+  const time = document.getElementById('m_time').value.trim();
+  if (!name || !time) { alert('名前と時間は必須です'); return; }
+  const rows = document.querySelectorAll('.res-item-row');
+  const items = [];
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const product = inputs[0].value.trim();
+    const qty = inputs[1].value.trim();
+    if (product) items.push({ product, qty: qty || '1' });
+  });
+  const d = getDay();
+  d.reservations.push({ id: Date.now(), name, time, items });
+  saveData(); renderReservations(); closeModal();
+  showToast('予約を追加しました');
+}
+
+function addShipItemRow() {
+  const container = document.getElementById('m_ship_items');
+  const row = document.createElement('div');
+  row.className = 'ship-item-row';
+  row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;';
+  row.innerHTML = `
+    <input type="text" placeholder="商品名（例：プレーン）" style="flex:2;font-size:14px;background:var(--cream);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);">
+    <input type="number" placeholder="個数" min="1" style="flex:1;font-size:14px;background:var(--cream);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);">
+    <button type="button" onclick="removeShipItemRow(this)" style="background:none;border:none;color:#ccc;font-size:20px;cursor:pointer;padding:0 4px;line-height:1;">×</button>`;
+  container.appendChild(row);
+}
+
+function removeShipItemRow(btn) {
+  const rows = document.querySelectorAll('.ship-item-row');
+  if (rows.length <= 1) return;
+  btn.closest('.ship-item-row').remove();
+}
+
+function submitShip() {
+  const dest = document.getElementById('m_dest').value.trim();
+  if (!dest) { alert('送付先は必須です'); return; }
+  const rows = document.querySelectorAll('.ship-item-row');
+  const items = [];
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const name = inputs[0].value.trim();
+    const qty = inputs[1].value.trim();
+    if (name) items.push({ name, qty: qty || '1' });
+  });
+  if (!items.length) { alert('内容物を1つ以上入力してください'); return; }
+  const d = getDay();
+  d.shipments.push({
+    id: Date.now(),
+    dest,
+    items,
+    arrival: document.getElementById('m_arrival').value,
+    note: document.getElementById('m_ship_note').value.trim(),
+    boxed: false,
+    labeled: false,
+  });
+  saveData(); renderShipments(); closeModal();
+  showToast('発送物を追加しました');
+}
+
+function toggleShipStatus(id, field) {
+  const dateKey = findItemDate(id, 'shipments');
+  if (!dateKey) return;
+  const s = data[dateKey].shipments.find(s => s.id === id);
+  if (s) { s[field] = !s[field]; saveData(); renderShipments(); }
+}
+
+function updateShipNote(id, value) {
+  const dateKey = findItemDate(id, 'shipments');
+  if (!dateKey) return;
+  const s = data[dateKey].shipments.find(s => s.id === id);
+  if (s) { s.note = value; saveData(); }
+}
+
+function submitHazard() {
+  const content = document.getElementById('m_content').value.trim();
+  if (!content) { alert('内容を入力してください'); return; }
+  const d = getDay();
+  d.hazards.push({
+    id: Date.now(),
+    category: document.getElementById('m_cat').value,
+    level: document.getElementById('m_level').value,
+    content,
+    action: document.getElementById('m_action').value,
+  });
+  saveData(); renderHazards(); closeModal();
+  showToast('ヒヤリハットを記録しました');
+}
+
+// ============================
+// STOCK (保管在庫リスト)
+// ============================
+function getMergedStocks() {
+  const today = getDay();
+  const todayIds = new Set(today.stocks.map(s => s.id));
+  const carried = [];
+  const seenIds = new Set(todayIds);
+  Object.keys(data)
+    .filter(d => d < currentDate)
+    .sort()
+    .forEach(d => {
+      (data[d].stocks || []).forEach(s => {
+        if (!seenIds.has(s.id)) {
+          seenIds.add(s.id);
+          carried.push({ ...s, _carried: true });
+        }
+      });
+    });
+  return [...carried, ...today.stocks];
+}
+
+function renderStocks() {
+  const items = getMergedStocks();
+  const el = document.getElementById('stockList');
+  if (!items.length) { el.innerHTML = '<div class="empty-msg">在庫はありません</div>'; return; }
+  el.innerHTML = items.map(s => `
+    <div style="background:var(--cream);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 12px 10px;margin-bottom:8px;">
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-size:15px;font-weight:700;">${esc(s.name)}</span>
+            ${s._carried ? '<span style="font-size:11px;color:var(--danger);font-weight:700;background:#FFF0F0;border-radius:20px;padding:2px 8px;">繰越</span>' : ''}
+          </div>
+          <div style="font-size:12px;color:var(--text-light);margin-top:2px;">📍 ${esc(s.location || '未設定')}</div>
+        </div>
+        <button onclick="confirmDeleteStock(${s.id}, '${esc(s.name).replace(/'/g,"&#39;")}')"
+          style="background:none;border:1.5px solid #ffcdd2;border-radius:8px;color:#C62828;font-size:12px;font-weight:700;font-family:'Noto Sans JP',sans-serif;padding:5px 10px;cursor:pointer;flex-shrink:0;">
+          削除
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+        <span style="font-size:13px;color:var(--text-light);white-space:nowrap;">📦 個数</span>
+        <input type="number" min="0" value="${esc(String(s.qty))}"
+          oninput="updateStockField(${s.id},'qty',this.value)"
+          style="width:70px;font-size:15px;font-weight:700;font-family:'Noto Sans JP',sans-serif;background:white;border:1.5px solid var(--border);border-radius:8px;padding:5px 8px;color:var(--text);text-align:right;">
+        <span style="font-size:13px;color:var(--text-light);">${esc(s.unit)}</span>
+      </div>
+      <textarea
+        placeholder="📝 備考を入力..."
+        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';updateStockField(${s.id},'note',this.value)"
+        style="width:100%;font-size:13px;color:var(--text-light);background:white;border:1.5px solid var(--border);border-radius:8px;padding:6px 8px;resize:none;font-family:'Noto Sans JP',sans-serif;min-height:36px;line-height:1.5;overflow:hidden;"
+        rows="1"
+      >${esc(s.note || '')}</textarea>
+    </div>`).join('');
+}
+
+function updateStockField(id, field, value) {
+  Object.keys(data).forEach(d => {
+    const s = (data[d].stocks || []).find(s => s.id === id);
+    if (s) { s[field] = value; }
+  });
+  saveData();
+}
+
+function submitStock() {
+  const name = document.getElementById('m_stock_name').value.trim();
+  if (!name) { alert('商品名を入力してください'); return; }
+  const d = getDay();
+  if (!d.stocks) d.stocks = [];
+  d.stocks.push({
+    id: Date.now(),
+    name,
+    qty: document.getElementById('m_stock_qty').value || '0',
+    unit: document.getElementById('m_stock_unit').value,
+    location: document.getElementById('m_stock_location').value.trim(),
+  });
+  saveData(); renderStocks(); closeModal();
+  showToast('在庫を追加しました');
+}
+
+// 削除確認モーダル
+let pendingDeleteStockId = null;
+function confirmDeleteStock(id, name) {
+  pendingDeleteStockId = id;
+  document.getElementById('deleteConfirmMsg').textContent = `「${name}」を削除しますか？`;
+  document.getElementById('deleteConfirmBtn').onclick = () => {
+    deleteStock(pendingDeleteStockId);
+    closeDeleteConfirm();
+  };
+  document.getElementById('deleteConfirmOverlay').style.display = 'flex';
+}
+
+function closeDeleteConfirm() {
+  document.getElementById('deleteConfirmOverlay').style.display = 'none';
+  pendingDeleteStockId = null;
+}
+
+function deleteStock(id) {
+  // 当日・過去日両方から削除
+  Object.keys(data).forEach(d => {
+    if (data[d].stocks) {
+      data[d].stocks = data[d].stocks.filter(s => s.id !== id);
+    }
+  });
+  saveData(); renderStocks();
+  showToast('在庫を削除しました');
+}
+
+// ============================
+// TOAST
+// ============================
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ============================
+// UTILS
+// ============================
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ============================
+// RENDER ALL
+// ============================
+function renderAll() {
+  updateHeader();
+  const d = getDay();
+  // Sales
+  document.getElementById('budget').value = d.budget || '';
+  document.getElementById('prevSales').value = d.prevSales || '';
+  document.getElementById('prevGuests').value = d.prevGuests || '';
+  calcUnit(); saveSales();
+  // Notes
+  document.getElementById('shareNote').value = d.shareNote || '';
+  updateSharePreview();
+  // Reset to preview mode on date change
+  document.getElementById('shareEditArea').style.display = 'none';
+  document.getElementById('sharePreview').style.display = 'block';
+  document.getElementById('shareToggleBtn').textContent = '✏️ 編集';
+  // Lists
+  renderOrders();
+  renderDailyTasks();
+  renderWeeklyTasks();
+  renderReservations();
+  renderShipments();
+  renderStocks();
+  renderConfirm();
+  renderHazards();
+}
+
+// ============================
+// INIT
+// ============================
+// Firebase SDK(type=module)の初期化を待ってから起動
+window._appInit = function() {
+  // 接続中インジケーターを表示
+  showToast('データを読み込み中...');
+  loadData();
+};
+
+// Firebase SDKがすでに読み込まれていれば即起動、まだなら待機
+if (window._fbReady) {
+  window._appInit();
+} else {
+  // SDKロード前でも最低限の画面を表示（オフライン対応）
+  data = {};
+  window.weeklyTasks = defaultWeeklyTasks();
+  window.staffList = ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
+  renderAll();
+}
+</script>
+</body>
+</html>
