@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>🧀 日報 | チーズケーキ店</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-<!-- Firebase SDK (compat版 = type=moduleなしで動作) -->
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
-  const firebaseConfig = {
+  firebase.initializeApp({
     apiKey: "AIzaSyBfdMJG7h1y0UysvpWDZ6cxDzje3c1FG_E",
     authDomain: "store-daily-report-cc029.firebaseapp.com",
     databaseURL: "https://store-daily-report-cc029-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -17,13 +17,7 @@
     storageBucket: "store-daily-report-cc029.firebasestorage.app",
     messagingSenderId: "503319985396",
     appId: "1:503319985396:web:c5166d55c7dc24b27ab2a1"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const _db = firebase.database();
-
-  window._fbSet = (path, value) => _db.ref(path).set(value);
-  window._fbListen = (path, callback) => _db.ref(path).on('value', snapshot => callback(snapshot.val()));
-  window._fbReady = true;
+  });
 </script>
 <style>
   :root {
@@ -793,35 +787,47 @@ function getDayOfWeek(ds) {
 }
 
 // ============================
-// STORAGE
-// ============================
-// ============================
-// FIREBASE 同期
+// STORAGE（Firebase同期）
 // ============================
 let _saveTimer = null;
 let _saveWeeklyTimer = null;
 let _saveStaffTimer = null;
+const _fbdb = firebase.database();
 
 function loadData() {
-  // Firebase リアルタイムリスナーで全データを受信
-  window._fbListen('reportData', val => {
-    data = val || {};
+  // Firebaseから一度だけ読み込んで起動
+  _fbdb.ref('/').once('value').then(snapshot => {
+    const val = snapshot.val() || {};
+    data = val.reportData || {};
+    window.weeklyTasks = val.weeklyTasks ? Object.values(val.weeklyTasks) : defaultWeeklyTasks();
+    window.staffList = val.staffList || ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
     renderAll();
-  });
-  window._fbListen('weeklyTasks', val => {
-    window.weeklyTasks = val ? Object.values(val) : defaultWeeklyTasks();
-    renderWeeklyTasks();
-  });
-  window._fbListen('staffList', val => {
-    window.staffList = val || ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
-    renderConfirm();
+    // 読み込み完了後にリアルタイム同期を開始（他端末の変更を反映）
+    _fbdb.ref('reportData').on('value', snap => {
+      const newData = snap.val();
+      if (newData) { data = newData; renderAll(); }
+    });
+    _fbdb.ref('weeklyTasks').on('value', snap => {
+      const v = snap.val();
+      if (v) { window.weeklyTasks = Object.values(v); renderWeeklyTasks(); }
+    });
+    _fbdb.ref('staffList').on('value', snap => {
+      const v = snap.val();
+      if (v) { window.staffList = v; renderConfirm(); }
+    });
+  }).catch(() => {
+    // オフライン時はデフォルト値で起動
+    data = {};
+    window.weeklyTasks = defaultWeeklyTasks();
+    window.staffList = ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
+    renderAll();
   });
 }
 
 function saveStaff() {
   clearTimeout(_saveStaffTimer);
   _saveStaffTimer = setTimeout(() => {
-    window._fbSet('staffList', window.staffList);
+    _fbdb.ref('staffList').set(window.staffList);
   }, 300);
 }
 
@@ -845,14 +851,12 @@ function deleteStaff(name) {
 }
 
 function saveData() {
-  // デバウンス：連続入力時は300ms待ってから1回だけ書き込む
   clearTimeout(_saveTimer);
   const ind = document.getElementById('syncIndicator');
   if (ind) ind.textContent = '同期中...';
   _saveTimer = setTimeout(() => {
-    window._fbSet('reportData', data).then(() => {
-      if (ind) ind.textContent = '✓ 保存済';
-      setTimeout(() => { if (ind) ind.textContent = ''; }, 2000);
+    _fbdb.ref('reportData').set(data).then(() => {
+      if (ind) { ind.textContent = '✓ 保存済'; setTimeout(() => { ind.textContent = ''; }, 2000); }
     }).catch(() => {
       if (ind) ind.textContent = '⚠ 保存失敗';
     });
@@ -862,10 +866,9 @@ function saveData() {
 function saveWeeklyTasks() {
   clearTimeout(_saveWeeklyTimer);
   _saveWeeklyTimer = setTimeout(() => {
-    // 配列をオブジェクト形式に変換（Firebaseは配列よりオブジェクトが安定）
     const obj = {};
     window.weeklyTasks.forEach((t, i) => { obj[t.id || i] = t; });
-    window._fbSet('weeklyTasks', obj);
+    _fbdb.ref('weeklyTasks').set(obj);
   }, 300);
 }
 
