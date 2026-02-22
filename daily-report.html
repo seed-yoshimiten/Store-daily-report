@@ -802,21 +802,7 @@ function loadData() {
     window.weeklyTasks = val.weeklyTasks ? Object.values(val.weeklyTasks) : defaultWeeklyTasks();
     window.staffList = val.staffList || ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
     renderAll();
-    // 読み込み完了後にリアルタイム同期を開始（他端末の変更を反映）
-    _fbdb.ref('reportData').on('value', snap => {
-      const newData = snap.val();
-      if (newData) { data = newData; renderAll(); }
-    });
-    _fbdb.ref('weeklyTasks').on('value', snap => {
-      const v = snap.val();
-      if (v) { window.weeklyTasks = Object.values(v); renderWeeklyTasks(); }
-    });
-    _fbdb.ref('staffList').on('value', snap => {
-      const v = snap.val();
-      if (v) { window.staffList = v; renderConfirm(); }
-    });
   }).catch(() => {
-    // オフライン時はデフォルト値で起動
     data = {};
     window.weeklyTasks = defaultWeeklyTasks();
     window.staffList = ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
@@ -850,18 +836,33 @@ function deleteStaff(name) {
   showToast(`${name} を削除しました`);
 }
 
+let _isSaving = false;
+
 function saveData() {
   clearTimeout(_saveTimer);
   const ind = document.getElementById('syncIndicator');
   if (ind) ind.textContent = '同期中...';
   _saveTimer = setTimeout(() => {
+    _isSaving = true;
     _fbdb.ref('reportData').set(data).then(() => {
       if (ind) { ind.textContent = '✓ 保存済'; setTimeout(() => { ind.textContent = ''; }, 2000); }
+      setTimeout(() => { _isSaving = false; }, 1000);
     }).catch(() => {
       if (ind) ind.textContent = '⚠ 保存失敗';
+      _isSaving = false;
     });
   }, 300);
 }
+
+// 他端末の変更をポーリングで5秒ごとに取得（リアルタイムリスナーの代替）
+setInterval(() => {
+  if (_isSaving) return;
+  _fbdb.ref('reportData').once('value').then(snap => {
+    if (_isSaving) return;
+    const remote = snap.val();
+    if (remote) { data = remote; renderAll(); }
+  });
+}, 5000);
 
 function saveWeeklyTasks() {
   clearTimeout(_saveWeeklyTimer);
