@@ -633,6 +633,24 @@
     </div>
   </div>
 
+  <!-- 気を付けるもの -->
+  <div class="card">
+    <div class="card-header" style="background:#A0785A;">⚠️ 気を付けるもの</div>
+    <div class="card-body">
+      <div id="cautionList"></div>
+      <button class="save-btn" style="background:#A0785A;margin-top:4px;" onclick="openModal('caution')">＋ 追加</button>
+    </div>
+  </div>
+
+  <!-- 今日の引き -->
+  <div class="card">
+    <div class="card-header" style="background:#4A7C6F;">🏷 今日の引き</div>
+    <div class="card-body">
+      <div id="pullList"></div>
+      <button class="save-btn" style="background:#4A7C6F;margin-top:4px;" onclick="openModal('pull')">＋ 追加</button>
+    </div>
+  </div>
+
   <!-- ⑤ 日次タスク -->
   <div class="card">
     <div class="card-header" style="background:#6D8B74;">✅ タスク（日次）</div>
@@ -966,6 +984,8 @@ function sanitizeAllData() {
     if (!Array.isArray(d.stocks))       d.stocks = [];
     if (!Array.isArray(d.hazards))      d.hazards = [];
     if (!Array.isArray(d.resImages))    d.resImages = [];
+    if (!Array.isArray(d.cautions))     d.cautions = [];
+    if (!Array.isArray(d.pulls))        d.pulls = [];
     if (typeof d.confirms !== 'object' || Array.isArray(d.confirms)) d.confirms = {};
     if (typeof d.weeklyChecked !== 'object' || Array.isArray(d.weeklyChecked)) d.weeklyChecked = {};
     if (typeof d.scheduleChecked !== 'object' || Array.isArray(d.scheduleChecked)) d.scheduleChecked = {};
@@ -1828,6 +1848,31 @@ function openModal(type) {
         <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
         <button class="btn-submit" onclick="submitStock()">追加</button>
       </div>`;
+  } else if (type === 'caution') {
+    html = `
+      <div class="modal-title">⚠️ 気を付けるものを追加</div>
+      <div class="form-group"><label>商品名</label><input type="text" id="m_caution_name" placeholder="例：いちごタルト"></div>
+      <div class="form-group">
+        <label>個数</label>
+        <input type="number" id="m_caution_qty" placeholder="0" min="0">
+      </div>
+      <div class="form-group"><label>期限</label><input type="date" id="m_caution_date"></div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+        <button class="btn-submit" onclick="submitCaution()">追加</button>
+      </div>`;
+  } else if (type === 'pull') {
+    html = `
+      <div class="modal-title">🏷 今日の引きを追加</div>
+      <div class="form-group"><label>商品名</label><input type="text" id="m_pull_name" placeholder="例：チーズケーキ"></div>
+      <div class="form-group">
+        <label>個数</label>
+        <input type="number" id="m_pull_qty" placeholder="0" min="0">
+      </div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+        <button class="btn-submit" onclick="submitPull()">追加</button>
+      </div>`;
   }
   modal.innerHTML = html;
   document.getElementById('modalOverlay').classList.add('active');
@@ -2031,6 +2076,89 @@ function submitStock() {
   showToast('在庫を追加しました');
 }
 
+// ============================
+// 気を付けるもの
+// ============================
+function renderCautions() {
+  const d = getDay();
+  const el = document.getElementById('cautionList');
+  const items = d.cautions || [];
+  if (!items.length) { el.innerHTML = '<div class="empty-msg">なし</div>'; return; }
+  const today = new Date().toISOString().slice(0,10);
+  el.innerHTML = items.map(item => {
+    const isExpired = item.date && item.date < today;
+    const isToday   = item.date && item.date === today;
+    const dateColor = isExpired ? '#C62828' : isToday ? '#E65100' : 'var(--text-light)';
+    const dateBadge = item.date
+      ? `<span style="font-size:11px;font-weight:700;color:${dateColor};background:${isExpired?'#FFEBEE':isToday?'#FFF3E0':'var(--cream2)'};border-radius:20px;padding:2px 8px;">期限: ${item.date}${isExpired?' ⚠':''}${isToday?' 本日':''}</span>`
+      : '';
+    return `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);">
+      <span style="flex:1;font-size:14px;font-weight:700;">${esc(item.name)}</span>
+      <span style="font-size:13px;color:var(--text-light);">${esc(item.qty)}個</span>
+      ${dateBadge}
+      <button onclick="deleteCaution(${item.id})" class="delete-btn" style="font-size:13px;">削除</button>
+    </div>`;
+  }).join('');
+}
+
+function submitCaution() {
+  const name = document.getElementById('m_caution_name').value.trim();
+  if (!name) { alert('商品名を入力してください'); return; }
+  const d = getDay();
+  if (!d.cautions) d.cautions = [];
+  d.cautions.push({
+    id: Date.now(),
+    name,
+    qty: document.getElementById('m_caution_qty').value || '0',
+    date: document.getElementById('m_caution_date').value || '',
+  });
+  saveData(); renderCautions(); closeModal();
+  showToast('追加しました');
+}
+
+function deleteCaution(id) {
+  const d = getDay();
+  d.cautions = (d.cautions || []).filter(i => i.id !== id);
+  saveData(); renderCautions();
+}
+
+// ============================
+// 今日の引き
+// ============================
+function renderPulls() {
+  const d = getDay();
+  const el = document.getElementById('pullList');
+  const items = d.pulls || [];
+  if (!items.length) { el.innerHTML = '<div class="empty-msg">なし</div>'; return; }
+  el.innerHTML = items.map(item => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);">
+      <span style="flex:1;font-size:14px;font-weight:700;">${esc(item.name)}</span>
+      <span style="font-size:13px;color:var(--text-light);">${esc(item.qty)}個</span>
+      <button onclick="deletePull(${item.id})" class="delete-btn" style="font-size:13px;">削除</button>
+    </div>`).join('');
+}
+
+function submitPull() {
+  const name = document.getElementById('m_pull_name').value.trim();
+  if (!name) { alert('商品名を入力してください'); return; }
+  const d = getDay();
+  if (!d.pulls) d.pulls = [];
+  d.pulls.push({
+    id: Date.now(),
+    name,
+    qty: document.getElementById('m_pull_qty').value || '0',
+  });
+  saveData(); renderPulls(); closeModal();
+  showToast('追加しました');
+}
+
+function deletePull(id) {
+  const d = getDay();
+  d.pulls = (d.pulls || []).filter(i => i.id !== id);
+  saveData(); renderPulls();
+}
+
 // 削除確認モーダル
 let pendingDeleteStockId = null;
 function confirmDeleteStock(id, name) {
@@ -2101,6 +2229,8 @@ function renderAll() {
   document.getElementById('persistShareToggleBtn').textContent = '✏️ 編集';
   // Lists
   loadTodaySchedule();
+  renderCautions();
+  renderPulls();
   renderOrders();
   renderDailyTasks();
   renderWeeklyTasks();
