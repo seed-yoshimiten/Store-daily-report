@@ -661,8 +661,14 @@
   <div class="card">
     <div class="card-header" style="background:#5B7FA6;">📅 予約確認</div>
     <div class="card-body">
+      <!-- 予約画像エリア -->
+      <div id="resImageList" style="margin-bottom:10px;"></div>
+      <label style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--cream2);border:2px dashed var(--border);border-radius:var(--radius-sm);padding:12px;cursor:pointer;font-size:14px;font-weight:700;color:var(--brown-light);margin-bottom:10px;">
+        📷 予約表を撮影・選択
+        <input type="file" accept="image/*" capture="environment" onchange="uploadResImage(this)" style="display:none;">
+      </label>
       <div id="resList"></div>
-      <button class="save-btn" style="background:var(--brown)" onclick="openModal('res')">＋ 予約を追加</button>
+      <button class="save-btn" style="background:var(--brown)" onclick="openModal('res')">＋ 予約を手入力</button>
     </div>
   </div>
 
@@ -733,6 +739,14 @@
   </div>
 
 </main>
+
+<!-- ========= 画像拡大モーダル ========= -->
+<div id="imageViewerOverlay" onclick="closeImageViewer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:500;align-items:center;justify-content:center;padding:16px;">
+  <div style="position:relative;max-width:100%;max-height:100%;">
+    <img id="imageViewerImg" src="" style="max-width:100%;max-height:90vh;border-radius:10px;display:block;">
+    <button onclick="closeImageViewer()" style="position:absolute;top:-12px;right:-12px;background:#fff;border:none;border-radius:50%;width:32px;height:32px;font-size:20px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;">×</button>
+  </div>
+</div>
 
 <!-- ========= 削除確認モーダル ========= -->
 <div class="modal-overlay" id="deleteConfirmOverlay" style="display:none;align-items:center;justify-content:center;">
@@ -825,6 +839,7 @@ const _fbdb = firebase.database();
 let _saveTimer = null;
 let _saveWeeklyTimer = null;
 let _saveStaffTimer = null;
+let _saveDisabled = false; // 接続失敗時に保存を無効化するフラグ
 
 function loadData() {
   const ind = document.getElementById('syncIndicator');
@@ -839,21 +854,29 @@ function loadData() {
     renderAll();
   }).catch(err => {
     console.error('Firebase load error:', err);
-    data = {};
-    window.weeklyTasks = defaultWeeklyTasks();
-    window.staffList = ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
-    if (ind) ind.textContent = '⚠ 接続失敗';
-    renderAll();
+    // 接続失敗時はデータをリセットせず、保存も無効化して画面にエラーを表示するのみ
+    if (ind) ind.textContent = '⚠ 接続失敗 - 再読み込みしてください';
+    _saveDisabled = true; // 接続失敗中は保存を無効化
+    // データが空のままrenderAllを呼ばない（画面を壊さない）
   });
 }
 
 function saveData() {
+  if (_saveDisabled) {
+    console.warn('保存無効中: Firebase未接続のため保存をスキップしました');
+    return;
+  }
   clearTimeout(_saveTimer);
   const ind = document.getElementById('syncIndicator');
   if (ind) ind.textContent = '保存中...';
   _saveTimer = setTimeout(() => {
     // dataのコピーを保存（非同期中にdataが変わっても安全）
     const snapshot = JSON.parse(JSON.stringify(data));
+    // 空データの上書きを防ぐ安全チェック
+    if (Object.keys(snapshot).length === 0) {
+      console.warn('空データの保存をスキップしました');
+      return;
+    }
     _fbdb.ref('reportData').set(snapshot)
       .then(() => {
         if (ind) { ind.textContent = '✓ 保存済'; setTimeout(() => { if(ind) ind.textContent = ''; }, 2000); }
@@ -942,6 +965,7 @@ function sanitizeAllData() {
     if (!Array.isArray(d.shipments))    d.shipments = [];
     if (!Array.isArray(d.stocks))       d.stocks = [];
     if (!Array.isArray(d.hazards))      d.hazards = [];
+    if (!Array.isArray(d.resImages))    d.resImages = [];
     if (typeof d.confirms !== 'object' || Array.isArray(d.confirms)) d.confirms = {};
     if (typeof d.weeklyChecked !== 'object' || Array.isArray(d.weeklyChecked)) d.weeklyChecked = {};
     if (typeof d.scheduleChecked !== 'object' || Array.isArray(d.scheduleChecked)) d.scheduleChecked = {};
@@ -1453,6 +1477,98 @@ function renderWeeklyTasks() {
 // ============================
 // RESERVATIONS
 // ============================
+// ============================
+// 予約画像
+// ============================
+function uploadResImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  showToast('画像を処理中...');
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    // Canvas で圧縮（長辺1200px・品質0.7）
+    const img = new Image();
+    img.onload = function() {
+      const maxSize = 1200;
+      let w = img.width, h = img.height;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+        else       { w = Math.round(w * maxSize / h); h = maxSize; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const compressed = canvas.toDataURL('image/jpeg', 0.7);
+
+      // Firebaseに保存
+      const d = getDay();
+      if (!d.resImages) d.resImages = [];
+      d.resImages.push({ id: Date.now(), data: compressed });
+      saveData();
+      renderResImages();
+      showToast('画像を追加しました');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = ''; // 同じファイルを再選択できるようリセット
+}
+
+function renderResImages() {
+  const d = getDay();
+  const images = d.resImages || [];
+  const el = document.getElementById('resImageList');
+  if (!images.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+      ${images.map(img => `
+        <div style="position:relative;">
+          <img src="${img.data}" onclick="openImageViewer('${img.id}')"
+            style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);cursor:pointer;">
+          <button onclick="deleteResImage(${img.id})"
+            style="position:absolute;top:-6px;right:-6px;background:#C62828;border:none;border-radius:50%;width:20px;height:20px;color:white;font-size:13px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;">×</button>
+        </div>`).join('')}
+    </div>`;
+}
+
+function openImageViewer(imgId) {
+  const d = getDay();
+  const img = (d.resImages || []).find(i => i.id == imgId);
+  if (!img) return;
+  const overlay = document.getElementById('imageViewerOverlay');
+  document.getElementById('imageViewerImg').src = img.data;
+  overlay.style.display = 'flex';
+}
+
+function closeImageViewer() {
+  document.getElementById('imageViewerOverlay').style.display = 'none';
+  document.getElementById('imageViewerImg').src = '';
+}
+
+function deleteResImage(imgId) {
+  const d = getDay();
+  d.resImages = (d.resImages || []).filter(i => i.id != imgId);
+  saveData();
+  renderResImages();
+  showToast('画像を削除しました');
+}
+
+// 7日以上前の画像データを自動削除（容量節約）
+function cleanOldImages() {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 7);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  let cleaned = false;
+  Object.keys(data).forEach(dateStr => {
+    if (dateStr < cutoffStr && data[dateStr].resImages && data[dateStr].resImages.length) {
+      data[dateStr].resImages = [];
+      cleaned = true;
+    }
+  });
+  if (cleaned) saveData();
+}
+
 function renderReservations() {
   const d = getDay();
   const el = document.getElementById('resList');
@@ -1988,6 +2104,7 @@ function renderAll() {
   renderOrders();
   renderDailyTasks();
   renderWeeklyTasks();
+  renderResImages();
   renderReservations();
   renderShipments();
   renderStocks();
@@ -2001,6 +2118,7 @@ function renderAll() {
 loadData();
 loadPersistNote();
 loadTodaySchedule();
+cleanOldImages();
 </script>
 </body>
 </html>
