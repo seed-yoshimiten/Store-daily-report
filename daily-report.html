@@ -854,7 +854,6 @@ function getDayOfWeek(ds) {
 // STORAGE（Firebase同期）
 // ============================
 const _fbdb = firebase.database();
-let _saveTimer = null;
 let _saveWeeklyTimer = null;
 let _saveStaffTimer = null;
 let _saveDisabled = false; // 接続失敗時に保存を無効化するフラグ
@@ -864,46 +863,97 @@ function loadData() {
   if (ind) ind.textContent = '読込中...';
   _fbdb.ref('/').once('value').then(snapshot => {
     const val = snapshot.val() || {};
-    data = val.reportData || {};
-    sanitizeAllData();
+    // セクション単位保存に対応したデータ読み込み
+    // reportData/{date}/{section} 形式と旧形式({date: {orders:...}})の両方に対応
+    const raw = val.reportData || {};
+    data = {};
+    Object.keys(raw).forEach(dateStr => {
+      const d = raw[dateStr] || {};
+      data[dateStr] = {
+        budget:       d.sales ? (d.sales.budget || '') : (d.budget || ''),
+        prevSales:    d.sales ? (d.sales.prevSales || '') : (d.prevSales || ''),
+        prevGuests:   d.sales ? (d.sales.prevGuests || '') : (d.prevGuests || ''),
+        shareNote:    d.shareNote || '',
+        orders:       Array.isArray(d.orders) ? d.orders : [],
+        dailyTasks:   Array.isArray(d.dailyTasks) ? d.dailyTasks : [],
+        weeklyChecked:typeof d.weeklyChecked === 'object' && !Array.isArray(d.weeklyChecked) ? d.weeklyChecked : {},
+        reservations: Array.isArray(d.reservations) ? d.reservations : [],
+        resImages:    Array.isArray(d.resImages) ? d.resImages : [],
+        shipments:    Array.isArray(d.shipments) ? d.shipments : [],
+        stocks:       Array.isArray(d.stocks) ? d.stocks : [],
+        confirms:     typeof d.confirms === 'object' && !Array.isArray(d.confirms) ? d.confirms : {},
+        hazards:      Array.isArray(d.hazards) ? d.hazards : [],
+        cautions:     Array.isArray(d.cautions) ? d.cautions : [],
+        pulls:        Array.isArray(d.pulls) ? d.pulls : [],
+        scheduleChecked: typeof d.scheduleChecked === 'object' && !Array.isArray(d.scheduleChecked) ? d.scheduleChecked : {},
+      };
+    });
     window.weeklyTasks = val.weeklyTasks ? Object.values(val.weeklyTasks) : defaultWeeklyTasks();
     window.staffList = Array.isArray(val.staffList) ? val.staffList : ['山田', '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村'];
     if (ind) ind.textContent = '';
+    _saveDisabled = false;
     renderAll();
+    cleanOldImages();
   }).catch(err => {
     console.error('Firebase load error:', err);
-    // 接続失敗時はデータをリセットせず、保存も無効化して画面にエラーを表示するのみ
     if (ind) ind.textContent = '⚠ 接続失敗 - 再読み込みしてください';
-    _saveDisabled = true; // 接続失敗中は保存を無効化
-    // データが空のままrenderAllを呼ばない（画面を壊さない）
+    _saveDisabled = true;
   });
 }
 
-function saveData() {
-  if (_saveDisabled) {
-    console.warn('保存無効中: Firebase未接続のため保存をスキップしました');
-    return;
-  }
-  clearTimeout(_saveTimer);
+// ============================================================
+// セクション単位保存（複数人同時入力の競合防止）
+// ============================================================
+const _sectionTimers = {};
+
+function saveSection(section) {
+  if (_saveDisabled) { console.warn('保存無効中'); return; }
+  const d = getDay();
+  if (!d) return;
   const ind = document.getElementById('syncIndicator');
   if (ind) ind.textContent = '保存中...';
-  _saveTimer = setTimeout(() => {
-    // dataのコピーを保存（非同期中にdataが変わっても安全）
-    const snapshot = JSON.parse(JSON.stringify(data));
-    // 空データの上書きを防ぐ安全チェック
-    if (Object.keys(snapshot).length === 0) {
-      console.warn('空データの保存をスキップしました');
-      return;
+  clearTimeout(_sectionTimers[section]);
+  _sectionTimers[section] = setTimeout(() => {
+    if (_saveDisabled) return;
+    let payload;
+    switch(section) {
+      case 'sales':
+        payload = { budget: d.budget||'', prevSales: d.prevSales||'', prevGuests: d.prevGuests||'' };
+        break;
+      case 'shareNote':    payload = d.shareNote || ''; break;
+      case 'orders':       payload = d.orders || []; break;
+      case 'dailyTasks':   payload = d.dailyTasks || []; break;
+      case 'weeklyChecked':payload = d.weeklyChecked || {}; break;
+      case 'reservations': payload = d.reservations || []; break;
+      case 'resImages':    payload = d.resImages || []; break;
+      case 'shipments':    payload = d.shipments || []; break;
+      case 'stocks':       payload = d.stocks || []; break;
+      case 'confirms':     payload = d.confirms || {}; break;
+      case 'hazards':      payload = d.hazards || []; break;
+      case 'cautions':     payload = d.cautions || []; break;
+      case 'pulls':        payload = d.pulls || []; break;
+      default: return;
     }
-    _fbdb.ref('reportData').set(snapshot)
+    const path = `reportData/${currentDate}/${section}`;
+    _fbdb.ref(path).set(payload)
       .then(() => {
-        if (ind) { ind.textContent = '✓ 保存済'; setTimeout(() => { if(ind) ind.textContent = ''; }, 2000); }
+        if (ind) { ind.textContent = '✓ 保存済'; setTimeout(() => { if(ind) ind.textContent=''; }, 2000); }
       })
       .catch(err => {
-        console.error('Save error:', err);
+        console.error(`Save error [${section}]:`, err);
         if (ind) ind.textContent = '⚠ 保存失敗';
       });
   }, 500);
+}
+
+// 旧saveData: 後方互換のため残す（内部でsaveSectionを呼ぶ）
+function saveData() {
+  if (_saveDisabled) { console.warn('保存無効中'); return; }
+  if (Object.keys(data).length === 0) { console.warn('空データのためスキップ'); return; }
+  // 全セクションを保存
+  ['sales','shareNote','orders','dailyTasks','weeklyChecked',
+   'reservations','resImages','shipments','stocks','confirms',
+   'hazards','cautions','pulls'].forEach(s => saveSection(s));
 }
 
 function saveWeeklyTasks() {
@@ -1078,15 +1128,35 @@ function updateHeader() {
 // ============================
 // SALES / METRICS
 // ============================
-function calcUnit() {
+function displayUnitPrice() {
+  // renderAll専用: dataへの書き込みなし、表示のみ
   const d = getDay();
-  d.prevSales = +document.getElementById('prevSales').value || 0;
-  d.prevGuests = +document.getElementById('prevGuests').value || 0;
-  const unit = d.prevGuests > 0 ? Math.round(d.prevSales / d.prevGuests) : 0;
-  document.getElementById('unitPrice').innerHTML = d.prevGuests > 0
+  const prevSales = d.prevSales || 0;
+  const prevGuests = d.prevGuests || 0;
+  const unit = prevGuests > 0 ? Math.round(prevSales / prevGuests) : 0;
+  document.getElementById('unitPrice').innerHTML = prevGuests > 0
     ? `${unit.toLocaleString()} <span class="metric-unit">円</span>`
     : `— <span class="metric-unit">円</span>`;
-  saveData();
+  const b = d.budget || 0;
+  document.getElementById('budgetDisp').innerHTML = b
+    ? `${b.toLocaleString()} <span class="metric-unit">円</span>`
+    : `— <span class="metric-unit">円</span>`;
+}
+
+function calcUnit() {
+  const d = getDay();
+  // ユーザー入力時のみdata書き込み（renderAllからは呼ばない）
+  if (document.activeElement && (document.activeElement.id === 'prevSales' || document.activeElement.id === 'prevGuests')) {
+    d.prevSales = +document.getElementById('prevSales').value || 0;
+    d.prevGuests = +document.getElementById('prevGuests').value || 0;
+  }
+  const prevSales = +document.getElementById('prevSales').value || 0;
+  const prevGuests = +document.getElementById('prevGuests').value || 0;
+  const unit = prevGuests > 0 ? Math.round(prevSales / prevGuests) : 0;
+  document.getElementById('unitPrice').innerHTML = prevGuests > 0
+    ? `${unit.toLocaleString()} <span class="metric-unit">円</span>`
+    : `— <span class="metric-unit">円</span>`;
+  saveSection('sales');
 }
 
 function saveSales() {
@@ -1096,13 +1166,13 @@ function saveSales() {
   document.getElementById('budgetDisp').innerHTML = b
     ? `${b.toLocaleString()} <span class="metric-unit">円</span>`
     : `— <span class="metric-unit">円</span>`;
-  saveData();
+  saveSection('sales');
 }
 
 function saveNote(key) {
   const d = getDay();
   d[key] = document.getElementById(key).value;
-  saveData();
+  saveSection(key);
 }
 
 function toggleShareMode() {
@@ -1279,7 +1349,7 @@ function addOrder() {
   const d = getDay();
   d.orders.push({ id: Date.now(), text, done: false });
   inp.value = '';
-  saveData();
+  saveSection('orders');
   renderOrders();
 }
 
@@ -1288,7 +1358,7 @@ function toggleOrder(id) {
   if (!dateKey) return;
   const item = data[dateKey].orders.find(o => o.id === id);
   if (item) item.done = !item.done;
-  saveData();
+  saveSection('orders');
   renderOrders();
 }
 
@@ -1296,7 +1366,7 @@ function deleteOrder(id) {
   const dateKey = findItemDate(id, 'orders');
   if (!dateKey) return;
   data[dateKey].orders = data[dateKey].orders.filter(o => o.id !== id);
-  saveData();
+  saveSection('orders');
   renderOrders();
 }
 
@@ -1322,7 +1392,7 @@ function addDailyTask() {
   const d = getDay();
   d.dailyTasks.push({ id: Date.now(), text, done: false });
   inp.value = '';
-  saveData();
+  saveSection('dailyTasks');
   renderDailyTasks();
 }
 
@@ -1331,7 +1401,7 @@ function toggleDailyTask(id) {
   if (!dateKey) return;
   const item = data[dateKey].dailyTasks.find(t => t.id === id);
   if (item) item.done = !item.done;
-  saveData();
+  saveSection('dailyTasks');
   renderDailyTasks();
 }
 
@@ -1339,7 +1409,7 @@ function deleteDailyTask(id) {
   const dateKey = findItemDate(id, 'dailyTasks');
   if (!dateKey) return;
   data[dateKey].dailyTasks = data[dateKey].dailyTasks.filter(t => t.id !== id);
-  saveData();
+  saveSection('dailyTasks');
   renderDailyTasks();
 }
 
@@ -1362,7 +1432,7 @@ function toggleWeeklyTask(id) {
   const d = getDay();
   if (!d.weeklyChecked) d.weeklyChecked = {};
   d.weeklyChecked[id] = !d.weeklyChecked[id];
-  saveData();
+  saveSection('weeklyChecked');
   renderWeeklyTasks();
 }
 
@@ -1525,7 +1595,7 @@ function uploadResImage(input) {
       const d = getDay();
       if (!d.resImages) d.resImages = [];
       d.resImages.push({ id: Date.now(), data: compressed });
-      saveData();
+      saveSection('resImages');
       renderResImages();
       showToast('画像を追加しました');
     };
@@ -1569,24 +1639,25 @@ function closeImageViewer() {
 function deleteResImage(imgId) {
   const d = getDay();
   d.resImages = (d.resImages || []).filter(i => i.id != imgId);
-  saveData();
+  saveSection('resImages');
   renderResImages();
   showToast('画像を削除しました');
 }
 
 // 7日以上前の画像データを自動削除（容量節約）
 function cleanOldImages() {
+  if (_saveDisabled) return;
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 7);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
-  let cleaned = false;
   Object.keys(data).forEach(dateStr => {
     if (dateStr < cutoffStr && data[dateStr].resImages && data[dateStr].resImages.length) {
       data[dateStr].resImages = [];
-      cleaned = true;
+      // 各日付のresImagesをそれぞれFirebaseに反映
+      _fbdb.ref(`reportData/${dateStr}/resImages`).set([])
+        .catch(err => console.error(`cleanOldImages error [${dateStr}]:`, err));
     }
   });
-  if (cleaned) saveData();
 }
 
 function renderReservations() {
@@ -1611,7 +1682,7 @@ function renderReservations() {
 function deleteReservation(id) {
   const d = getDay();
   d.reservations = d.reservations.filter(r => r.id !== id);
-  saveData(); renderReservations();
+  saveSection('reservations'); renderReservations();
 }
 
 // ============================
@@ -1669,7 +1740,7 @@ function deleteShipment(id) {
   const dateKey = findItemDate(id, 'shipments');
   if (!dateKey) return;
   data[dateKey].shipments = data[dateKey].shipments.filter(s => s.id !== id);
-  saveData(); renderShipments();
+  saveSection('shipments'); renderShipments();
 }
 
 // ============================
@@ -1717,21 +1788,21 @@ function toggleConfirm(name) {
       pct: existing.pct || ''
     };
   }
-  saveData(); renderConfirm();
+  saveSection('confirms'); renderConfirm();
   showToast(d.confirms[name].time ? `${name} さんが確認しました ✓` : `${name} さんの確認を解除`);
 }
 
 function saveConfirmSharedMemo(value) {
   const d = getDay();
   d.confirmSharedMemo = value;
-  saveData();
+  saveSection('confirms');
 }
 
 function updateConfirmField(name, field, value) {
   const d = getDay();
   if (!d.confirms[name]) d.confirms[name] = { pct: '' };
   d.confirms[name][field] = value;
-  saveData();
+  saveSection('confirms');
 }
 
 // ============================
@@ -1759,7 +1830,7 @@ function renderHazards() {
 function deleteHazard(id) {
   const d = getDay();
   d.hazards = d.hazards.filter(h => h.id !== id);
-  saveData(); renderHazards();
+  saveSection('hazards'); renderHazards();
 }
 
 // ============================
@@ -1918,7 +1989,7 @@ function submitRes() {
   });
   const d = getDay();
   d.reservations.push({ id: Date.now(), name, time, items });
-  saveData(); renderReservations(); closeModal();
+  saveSection('reservations'); renderReservations(); closeModal();
   showToast('予約を追加しました');
 }
 
@@ -1962,7 +2033,7 @@ function submitShip() {
     boxed: false,
     labeled: false,
   });
-  saveData(); renderShipments(); closeModal();
+  saveSection('shipments'); renderShipments(); closeModal();
   showToast('発送物を追加しました');
 }
 
@@ -1970,14 +2041,14 @@ function toggleShipStatus(id, field) {
   const dateKey = findItemDate(id, 'shipments');
   if (!dateKey) return;
   const s = data[dateKey].shipments.find(s => s.id === id);
-  if (s) { s[field] = !s[field]; saveData(); renderShipments(); }
+  if (s) { s[field] = !s[field]; saveSection('shipments'); renderShipments(); }
 }
 
 function updateShipNote(id, value) {
   const dateKey = findItemDate(id, 'shipments');
   if (!dateKey) return;
   const s = data[dateKey].shipments.find(s => s.id === id);
-  if (s) { s.note = value; saveData(); }
+  if (s) { s.note = value; saveSection('shipments'); }
 }
 
 function submitHazard() {
@@ -1991,7 +2062,7 @@ function submitHazard() {
     content,
     action: document.getElementById('m_action').value,
   });
-  saveData(); renderHazards(); closeModal();
+  saveSection('hazards'); renderHazards(); closeModal();
   showToast('ヒヤリハットを記録しました');
 }
 
@@ -2057,7 +2128,7 @@ function updateStockField(id, field, value) {
     const s = (data[d].stocks || []).find(s => s.id === id);
     if (s) { s[field] = value; }
   });
-  saveData();
+  saveSection('stocks');
 }
 
 function submitStock() {
@@ -2072,7 +2143,7 @@ function submitStock() {
     unit: document.getElementById('m_stock_unit').value,
     location: document.getElementById('m_stock_location').value.trim(),
   });
-  saveData(); renderStocks(); closeModal();
+  saveSection('stocks'); renderStocks(); closeModal();
   showToast('在庫を追加しました');
 }
 
@@ -2113,14 +2184,14 @@ function submitCaution() {
     qty: document.getElementById('m_caution_qty').value || '0',
     date: document.getElementById('m_caution_date').value || '',
   });
-  saveData(); renderCautions(); closeModal();
+  saveSection('cautions'); renderCautions(); closeModal();
   showToast('追加しました');
 }
 
 function deleteCaution(id) {
   const d = getDay();
   d.cautions = (d.cautions || []).filter(i => i.id !== id);
-  saveData(); renderCautions();
+  saveSection('cautions'); renderCautions();
 }
 
 // ============================
@@ -2149,14 +2220,14 @@ function submitPull() {
     name,
     qty: document.getElementById('m_pull_qty').value || '0',
   });
-  saveData(); renderPulls(); closeModal();
+  saveSection('pulls'); renderPulls(); closeModal();
   showToast('追加しました');
 }
 
 function deletePull(id) {
   const d = getDay();
   d.pulls = (d.pulls || []).filter(i => i.id !== id);
-  saveData(); renderPulls();
+  saveSection('pulls'); renderPulls();
 }
 
 // 削除確認モーダル
@@ -2183,7 +2254,7 @@ function deleteStock(id) {
       data[d].stocks = data[d].stocks.filter(s => s.id !== id);
     }
   });
-  saveData(); renderStocks();
+  saveSection('stocks'); renderStocks();
   showToast('在庫を削除しました');
 }
 
@@ -2216,7 +2287,7 @@ function renderAll() {
   document.getElementById('budget').value = d.budget || '';
   document.getElementById('prevSales').value = d.prevSales || '';
   document.getElementById('prevGuests').value = d.prevGuests || '';
-  calcUnit(); saveSales();
+  displayUnitPrice(); // renderAll内では表示のみ（データ書き込みなし）
   // Notes
   document.getElementById('shareNote').value = d.shareNote || '';
   updateSharePreview();
@@ -2248,7 +2319,6 @@ function renderAll() {
 loadData();
 loadPersistNote();
 loadTodaySchedule();
-cleanOldImages();
 </script>
 </body>
 </html>
