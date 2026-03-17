@@ -906,44 +906,65 @@ function loadData() {
 // ============================================================
 const _sectionTimers = {};
 
-function saveSection(section) {
+// debounce不要なセクション（チェック/削除など即時性が重要な操作）
+const _IMMEDIATE_SECTIONS = new Set(['orders','dailyTasks','shipments','weeklyChecked',
+  'reservations','resImages','hazards','cautions','pulls','stocks','confirms']);
+
+function saveSection(section, dateKey) {
   if (_saveDisabled) { console.warn('保存無効中'); return; }
-  const d = getDay();
+  const targetDate = dateKey || currentDate;
+  const d = data[targetDate];
   if (!d) return;
   const ind = document.getElementById('syncIndicator');
   if (ind) ind.textContent = '保存中...';
-  clearTimeout(_sectionTimers[section]);
-  _sectionTimers[section] = setTimeout(() => {
+
+  // 即時保存 or debounce
+  const immediate = _IMMEDIATE_SECTIONS.has(section);
+  const timerKey = section + '_' + targetDate;
+  clearTimeout(_sectionTimers[timerKey]);
+
+  const doSave = () => {
     if (_saveDisabled) return;
+    // 保存時点の最新データを取得（参照ではなくコピー）
+    const latest = data[targetDate];
+    if (!latest) return;
     let payload;
     switch(section) {
       case 'sales':
-        payload = { budget: d.budget||'', prevSales: d.prevSales||'', prevGuests: d.prevGuests||'' };
+        payload = { budget: latest.budget||'', prevSales: latest.prevSales||'', prevGuests: latest.prevGuests||'' };
         break;
-      case 'shareNote':    payload = d.shareNote || ''; break;
-      case 'orders':       payload = d.orders || []; break;
-      case 'dailyTasks':   payload = d.dailyTasks || []; break;
-      case 'weeklyChecked':payload = d.weeklyChecked || {}; break;
-      case 'reservations': payload = d.reservations || []; break;
-      case 'resImages':    payload = d.resImages || []; break;
-      case 'shipments':    payload = d.shipments || []; break;
-      case 'stocks':       payload = d.stocks || []; break;
-      case 'confirms':     payload = d.confirms || {}; break;
-      case 'hazards':      payload = d.hazards || []; break;
-      case 'cautions':     payload = d.cautions || []; break;
-      case 'pulls':        payload = d.pulls || []; break;
+      case 'shareNote':    payload = latest.shareNote || ''; break;
+      case 'orders':       payload = JSON.parse(JSON.stringify(latest.orders || [])); break;
+      case 'dailyTasks':   payload = JSON.parse(JSON.stringify(latest.dailyTasks || [])); break;
+      case 'weeklyChecked':payload = JSON.parse(JSON.stringify(latest.weeklyChecked || {})); break;
+      case 'reservations': payload = JSON.parse(JSON.stringify(latest.reservations || [])); break;
+      case 'resImages':    payload = JSON.parse(JSON.stringify(latest.resImages || [])); break;
+      case 'shipments':    payload = JSON.parse(JSON.stringify(latest.shipments || [])); break;
+      case 'stocks':       payload = JSON.parse(JSON.stringify(latest.stocks || [])); break;
+      case 'confirms':     payload = JSON.parse(JSON.stringify(latest.confirms || {})); break;
+      case 'hazards':      payload = JSON.parse(JSON.stringify(latest.hazards || [])); break;
+      case 'cautions':     payload = JSON.parse(JSON.stringify(latest.cautions || [])); break;
+      case 'pulls':        payload = JSON.parse(JSON.stringify(latest.pulls || [])); break;
       default: return;
     }
-    const path = `reportData/${currentDate}/${section}`;
+    const path = `reportData/${targetDate}/${section}`;
+    console.log(`[saveSection] ${section}@${targetDate}`, payload);
     _fbdb.ref(path).set(payload)
       .then(() => {
+        console.log(`[saveSection] ✓ 保存完了: ${section}@${targetDate}`);
         if (ind) { ind.textContent = '✓ 保存済'; setTimeout(() => { if(ind) ind.textContent=''; }, 2000); }
       })
       .catch(err => {
-        console.error(`Save error [${section}]:`, err);
+        console.error(`[saveSection] ✗ 保存失敗: ${section}@${targetDate}`, err);
         if (ind) ind.textContent = '⚠ 保存失敗';
       });
-  }, 500);
+  };
+
+  if (immediate) {
+    doSave(); // 即時保存
+  } else {
+    _sectionTimers[timerKey] = setTimeout(doSave, 500); // debounce
+  }
 }
 
 // 旧saveData: 後方互換のため残す（内部でsaveSectionを呼ぶ）
@@ -1366,7 +1387,7 @@ function toggleOrder(id) {
   if (!dateKey) return;
   const item = data[dateKey].orders.find(o => o.id === id);
   if (item) item.done = !item.done;
-  saveSection('orders');
+  saveSection('orders', dateKey);
   renderOrders();
 }
 
@@ -1374,7 +1395,7 @@ function deleteOrder(id) {
   const dateKey = findItemDate(id, 'orders');
   if (!dateKey) return;
   data[dateKey].orders = data[dateKey].orders.filter(o => o.id !== id);
-  saveSection('orders');
+  saveSection('orders', dateKey);
   renderOrders();
 }
 
@@ -1409,7 +1430,7 @@ function toggleDailyTask(id) {
   if (!dateKey) return;
   const item = data[dateKey].dailyTasks.find(t => t.id === id);
   if (item) item.done = !item.done;
-  saveSection('dailyTasks');
+  saveSection('dailyTasks', dateKey);
   renderDailyTasks();
 }
 
@@ -1417,7 +1438,7 @@ function deleteDailyTask(id) {
   const dateKey = findItemDate(id, 'dailyTasks');
   if (!dateKey) return;
   data[dateKey].dailyTasks = data[dateKey].dailyTasks.filter(t => t.id !== id);
-  saveSection('dailyTasks');
+  saveSection('dailyTasks', dateKey);
   renderDailyTasks();
 }
 
@@ -1748,7 +1769,7 @@ function deleteShipment(id) {
   const dateKey = findItemDate(id, 'shipments');
   if (!dateKey) return;
   data[dateKey].shipments = data[dateKey].shipments.filter(s => s.id !== id);
-  saveSection('shipments'); renderShipments();
+  saveSection('shipments', dateKey); renderShipments();
 }
 
 // ============================
@@ -2049,14 +2070,14 @@ function toggleShipStatus(id, field) {
   const dateKey = findItemDate(id, 'shipments');
   if (!dateKey) return;
   const s = data[dateKey].shipments.find(s => s.id === id);
-  if (s) { s[field] = !s[field]; saveSection('shipments'); renderShipments(); }
+  if (s) { s[field] = !s[field]; saveSection('shipments', dateKey); renderShipments(); }
 }
 
 function updateShipNote(id, value) {
   const dateKey = findItemDate(id, 'shipments');
   if (!dateKey) return;
   const s = data[dateKey].shipments.find(s => s.id === id);
-  if (s) { s.note = value; saveSection('shipments'); }
+  if (s) { s.note = value; saveSection('shipments', dateKey); }
 }
 
 function submitHazard() {
