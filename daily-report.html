@@ -2153,11 +2153,12 @@ function renderStocks() {
 }
 
 function updateStockField(id, field, value) {
+  let dateKey = null;
   Object.keys(data).forEach(d => {
     const s = (data[d].stocks || []).find(s => s.id === id);
-    if (s) { s[field] = value; }
+    if (s) { s[field] = value; dateKey = d; }
   });
-  saveSection('stocks');
+  if (dateKey) saveSection('stocks', dateKey);
 }
 
 function submitStock() {
@@ -2277,13 +2278,13 @@ function closeDeleteConfirm() {
 }
 
 function deleteStock(id) {
-  // 当日・過去日両方から削除
   Object.keys(data).forEach(d => {
-    if (data[d].stocks) {
+    if (data[d].stocks && data[d].stocks.find(s => s.id === id)) {
       data[d].stocks = data[d].stocks.filter(s => s.id !== id);
+      saveSection('stocks', d); // 各日付ごとに正しいパスに保存
     }
   });
-  saveSection('stocks'); renderStocks();
+  renderStocks();
   showToast('在庫を削除しました');
 }
 
