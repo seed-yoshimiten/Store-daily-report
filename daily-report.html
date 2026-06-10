@@ -1083,6 +1083,25 @@ function getMergedOrders() {
   return [...carried, ...today.orders];
 }
 
+function getMergedCautions() {
+  const today = getDay();
+  const todayIds = new Set((today.cautions || []).map(c => c.id));
+  const carried = [];
+  const seenIds = new Set(todayIds);
+  Object.keys(data)
+    .filter(d => d < currentDate)
+    .sort()
+    .forEach(d => {
+      (data[d].cautions || []).forEach(c => {
+        if (!seenIds.has(c.id)) {
+          seenIds.add(c.id);
+          carried.push({ ...c, _carried: true });
+        }
+      });
+    });
+  return [...carried, ...(today.cautions || [])];
+}
+
 function getMergedDailyTasks() {
   const today = getDay();
   const todayIds = new Set(today.dailyTasks.map(t => t.id));
@@ -2181,9 +2200,8 @@ function submitStock() {
 // 気を付けるもの
 // ============================
 function renderCautions() {
-  const d = getDay();
   const el = document.getElementById('cautionList');
-  const items = d.cautions || [];
+  const items = getMergedCautions();
   if (!items.length) { el.innerHTML = '<div class="empty-msg">なし</div>'; return; }
   const today = new Date().toISOString().slice(0,10);
   el.innerHTML = items.map(item => {
@@ -2193,11 +2211,18 @@ function renderCautions() {
     const dateBadge = item.date
       ? `<span style="font-size:11px;font-weight:700;color:${dateColor};background:${isExpired?'#FFEBEE':isToday?'#FFF3E0':'var(--cream2)'};border-radius:20px;padding:2px 8px;">期限: ${item.date}${isExpired?' ⚠':''}${isToday?' 本日':''}</span>`
       : '';
+    const carriedBadge = item._carried
+      ? `<span style="font-size:11px;color:var(--danger);font-weight:700;background:#FFF0F0;border-radius:20px;padding:2px 8px;flex-shrink:0;">繰越</span>`
+      : '';
     return `
     <div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);">
       <span style="flex:1;font-size:14px;font-weight:700;">${esc(item.name)}</span>
-      <span style="font-size:13px;color:var(--text-light);">${esc(item.qty)}個</span>
+      <input type="number" min="0" value="${esc(String(item.qty))}"
+        onchange="updateCautionQty(${item.id}, this.value)"
+        style="width:52px;font-size:13px;border:1.5px solid var(--border);border-radius:6px;padding:3px 5px;text-align:center;font-family:'Noto Sans JP',sans-serif;">
+      <span style="font-size:12px;color:var(--text-light);">個</span>
       ${dateBadge}
+      ${carriedBadge}
       <button onclick="deleteCaution(${item.id})" class="delete-btn" style="font-size:13px;">削除</button>
     </div>`;
   }).join('');
@@ -2219,9 +2244,23 @@ function submitCaution() {
 }
 
 function deleteCaution(id) {
-  const d = getDay();
-  d.cautions = (d.cautions || []).filter(i => i.id !== id);
-  saveSection('cautions'); renderCautions();
+  // 繰越元を含む全日付から削除
+  Object.keys(data).forEach(d => {
+    if (data[d].cautions && data[d].cautions.find(c => c.id === id)) {
+      data[d].cautions = data[d].cautions.filter(c => c.id !== id);
+      saveSection('cautions', d);
+    }
+  });
+  renderCautions();
+}
+
+function updateCautionQty(id, value) {
+  let dateKey = null;
+  Object.keys(data).forEach(d => {
+    const item = (data[d].cautions || []).find(c => c.id === id);
+    if (item) { item.qty = value; dateKey = d; }
+  });
+  if (dateKey) saveSection('cautions', dateKey);
 }
 
 // ============================
@@ -2235,7 +2274,10 @@ function renderPulls() {
   el.innerHTML = items.map(item => `
     <div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);">
       <span style="flex:1;font-size:14px;font-weight:700;">${esc(item.name)}</span>
-      <span style="font-size:13px;color:var(--text-light);">${esc(item.qty)}個</span>
+      <input type="number" min="0" value="${esc(String(item.qty))}"
+        onchange="updatePullQty(${item.id}, this.value)"
+        style="width:52px;font-size:13px;border:1.5px solid var(--border);border-radius:6px;padding:3px 5px;text-align:center;font-family:'Noto Sans JP',sans-serif;">
+      <span style="font-size:12px;color:var(--text-light);">個</span>
       <button onclick="deletePull(${item.id})" class="delete-btn" style="font-size:13px;">削除</button>
     </div>`).join('');
 }
@@ -2258,6 +2300,12 @@ function deletePull(id) {
   const d = getDay();
   d.pulls = (d.pulls || []).filter(i => i.id !== id);
   saveSection('pulls'); renderPulls();
+}
+
+function updatePullQty(id, value) {
+  const d = getDay();
+  const item = (d.pulls || []).find(p => p.id === id);
+  if (item) { item.qty = value; saveSection('pulls'); }
 }
 
 // 削除確認モーダル
